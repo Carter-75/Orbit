@@ -1,0 +1,66 @@
+# Review the $14/month minimum Render compute estimate in docs/deployment.md.
+# This file does not provision resources until an owner approves deployment.
+services:
+  - type: web
+    name: orbit-app
+    runtime: node
+    repo: https://github.com/Carter-75/Orbit
+    plan: 0.5c-512mb
+    region: ohio
+    numInstances: 1
+    autoDeployTrigger: checksPass
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: PUBLIC_LAUNCH
+        value: "false"
+      - key: MONGODB_DATABASE
+        value: orbit
+      - key: MONGODB_URI
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: ASSET_ORIGIN
+        fromService:
+          name: orbit-assets
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+  - type: web
+    name: orbit-assets
+    runtime: node
+    repo: https://github.com/Carter-75/Orbit
+    plan: 0.5c-512mb
+    region: ohio
+    numInstances: 1
+    autoDeployTrigger: checksPass
+    buildCommand: npm ci --omit=dev
+    startCommand: node src/asset-server.js
+    healthCheckPath: /health/ready
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: PUBLIC_LAUNCH
+        value: "false"
+      - key: MONGODB_DATABASE
+        value: orbit
+      - key: MONGODB_URI
+        sync: false
+      - key: APP_ORIGIN
+        fromService:
+          name: orbit-app
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: ASSET_ORIGIN
+        fromService:
+          name: orbit-assets
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL

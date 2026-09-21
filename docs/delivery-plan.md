@@ -1,0 +1,51 @@
+# Orbit delivery plan — 2026-09-20
+
+Status: active implementation. Not production ready or deployed.
+
+## Baseline audit
+
+Seven prototype files, no repository, dependencies, database, tests, real accounts, upload workflow, or deployment manifest. Fake activity and friends. Static handler serves entire working directory. WebSocket parser cannot handle fragmented/coalesced TCP frames, does not authenticate upgrades, and has no quotas or reconnect recovery. Chat key handler intercepts typing. Browser verification in earlier conversation did not demonstrate working multiplayer. Prototype preserved under archive/prototype-2026-09-20 before replacement.
+
+## Intended architecture
+
+- Maintained Node/Express application and WebSocket transport; MongoDB persisted identity, sessions, social graph, projects, versions, reports and money ledger.
+- Explicit public static directory; no repository-root serving. Private session cookies and same-origin mutation checks. No browser secrets.
+- Separate asset service origin, sandboxed iframe, versioned assets and capability-limited postMessage bridge. ZIP browser exports supported initially; native binaries/Roblox files unsupported. Creator servers require a later isolated execution service, not execution inside the API process.
+- Render Blueprint, GitHub CI, MongoDB indexes and environment preflight. Single-instance beta only until shared realtime coordination is implemented and tested. Asset storage choice pending hosting research.
+- Stripe Connect test flows first; live commission, costs and payouts await user approval. Ads pending eligible provider approval; no invented ad revenue.
+- ChatGPT: official plugin docs confirm MCP tools and optional iframe UI; likely useful for discovery and creator status. This does not establish arbitrary embedded game compatibility or publication approval.
+
+## Milestones and acceptance evidence
+
+1. Foundation: explicit server boundaries, validated configuration, real Mongo-backed accounts/sessions/recovery, security tests and persistence checks.
+2. Publishing: a second independent creator imports a documented browser ZIP, previews, submits/publishes, updates/rolls back, while untrusted code cannot access platform sessions.
+3. Social/gameplay: distinct users friend/block/invite, join a published example, synchronize state, reconnect; mobile and keyboard checks; no fake metrics.
+4. Revenue/admin: test webhooks, deduplication and entitlements, cancellation/refunds/disputes, creator ledger; moderation/support/reconciliation controls.
+5. Delivery: reproducible fresh deployment, backup restore and restart checks, measured capacity, clear operational runbook, final requirement audit.
+6. Launch materials: cited positioning/channel experiments, original visual assets, honest copy, vertical/horizontal videos where possible or complete fallback production package.
+
+## Decisions pending
+
+- User confirmed ages 13+, with age-appropriate protections. Account age-band checks implemented; broader teen controls still required before public launch.
+- User supplied https://github.com/Carter-75/Orbit, verified empty/public. Local Git initialized and origin configured. GitHub CLI connected to Carter-75, checked without exposing credential.
+- No Mongo/Render/Stripe/ad account configuration established. Work continues locally without live billing or external promotion.
+
+## Verification levels
+
+Record implemented, locally verified, staging verified and production verified separately. A mock or syntax check is not evidence of an end-to-end live flow. Goal remains active until all requirements have appropriate evidence or required external actions are explicitly surfaced after independent work is complete.
+
+## First implementation checkpoint
+
+- Installed maintained Express/Mongo/ws/validation dependencies. Initial package audit: zero reported vulnerabilities (not proof of application security).
+- Implemented auth, email outbox, package validator, projects, separate asset service and launch grants; account/discovery/creator UI in public/.
+- Auth, package, foundation and asset authorization tests passed locally against disposable real MongoDB. Projects tests passed separately. Rerun integrated suite after mounting social/admin modules and review final totals.
+- Prepared Render Blueprint (two paid service definitions, no provisioning) and CI. Expected minimum compute $14/month per cited current plan; user has not authorized spending.
+- No staging/production verification. No full browser-game isolation/SDK integration test yet. No video frames inspected; visual references remain text/image search descriptions.
+
+### Integration checkpoint, September 21
+
+Auth now uses durable mail queue with leases/retry and no recovery secrets in job payloads. Social and admin routes are mounted; friend UI added after a delegated UI task hit an agent usage limit. Social same-age-band restrictions are a provisional implemented policy, not the full teen safety program. Project/asset routes are mounted; studio styling linked. Production registration is disabled while PUBLIC_LAUNCH=false. Admin bootstrap and staging test-account creation still need an operator workflow.
+
+Next required work: browser verification of account and creator flows; finish moderator/profile screens; platform SDK and starter packages; authenticated realtime rooms, privacy-aware presence/invitations and moderated chat; favorites/analytics/reports/support; full monetization; release/deployment evidence and promotion. Preserve this full scope through continuation.
+
+Verification recorded September 21: complete integrated suite 26/26 passing; targeted foundation suite 2/2 passing after adding production-registration gate assertion. Public app/social modules pass syntax checks. These are local tests, not browser or production evidence. Git checkpoint preparation in progress; remote push/deployment not yet verified.
