@@ -1,5 +1,6 @@
 import { renderSocial } from './social.js';
 import { createGameBridge } from './game-bridge.js';
+import { renderSafety, reportGame, renderModeration } from './safety.js';
 let closeBridge;
 const $ = (selector) => document.querySelector(selector);
 let mode = 'login';
@@ -23,6 +24,7 @@ async function api(path, body) {
   return data;
 }
 function displayAccount() {
+  renderSafety(user); void renderModeration(user, launchGame);
   if (!user) { closeBridge?.(); $('#game-frame').removeAttribute('src'); $('#play-area').hidden = true; }
   void renderSocial(user);
   $('#account-button').textContent = user ? user.username : 'Sign in';
@@ -100,6 +102,8 @@ function renderGames() {
       finally { play.disabled = false; }
     };
     card.append(play);
+    const report = document.createElement('button'); report.textContent = 'Report';
+    report.onclick = () => user ? reportGame(game._id) : openAuth(); card.append(report);
   }
 }
 $('#search').oninput = renderGames;

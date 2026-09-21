@@ -36,7 +36,7 @@ export function attachRealtime({ server, db, config, auth }) {
   async function handle(peer, message) {
     if (!message || typeof message !== 'object') return;
     const user = await auth.resolveSession(peer.cookie);
-    if (!user?.emailVerified) { peer.ws.close(1008, 'Account unavailable'); return; }
+    if (!user?.emailVerified) { leave(peer); peer.ws.close(1008, 'Account unavailable'); return; }
     peer.user = user;
     if (message.type === 'join') {
       const access = await gameAccess(db, user, message.grantId, 'multiplayer');
@@ -47,6 +47,9 @@ export function attachRealtime({ server, db, config, auth }) {
       if (room && (room.projectId !== access.project._id || room.versionId !== access.version._id || room.preview !== access.grant.preview)) return send(peer.ws, { type: 'error', error: 'Room unavailable for this build.' });
       if (room && (!await compatible(user, room.members) || (room.members.size >= room.capacity && !room.members.has(user._id)))) return send(peer.ws, { type: 'error', error: 'Room is full or unavailable.' });
       if (!room && rooms.size >= 100) return send(peer.ws, { type: 'error', error: 'Rooms are busy. Try later.' });
+      // A close event can run while the database checks above are pending.
+      // Never add a departed socket back after close already cleaned it up.
+      if (peer.ws.readyState !== WebSocket.OPEN) return;
       leave(peer);
       if (!room) {
         room = { id: randomUUID(), projectId: access.project._id, versionId: access.version._id,
@@ -121,13 +124,13 @@ export function attachRealtime({ server, db, config, auth }) {
   const timer = setInterval(async () => {
     for (const ws of wss.clients) {
       const peer = ws.peer;
-      if (!peer.alive) { ws.terminate(); continue; }
+      if (!peer.alive) { leave(peer); ws.terminate(); continue; }
       peer.alive = false; ws.ping();
       try {
         const user = await auth.resolveSession(peer.cookie);
         const room = rooms.get(peer.roomId);
-        if (!user || (room && (!await gameAccess(db, user, peer.grantId, 'multiplayer') || !await compatible(user, room.members)))) ws.close(1008, 'Session ended');
-      } catch { ws.close(1013, 'Service unavailable'); }
+        if (!user?.emailVerified || (room && (!await gameAccess(db, user, peer.grantId, 'multiplayer') || !await compatible(user, room.members)))) { leave(peer); ws.close(1008, 'Session ended'); }
+      } catch { leave(peer); ws.close(1013, 'Service unavailable'); }
     }
   }, 15000); timer.unref();
   return { rooms, close: () => { clearInterval(timer); for (const ws of wss.clients) ws.close(1001, 'Server restarting'); wss.close(); } };

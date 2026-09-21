@@ -47,13 +47,16 @@ export async function renderSocial(user) {
         }
         if (key === 'friends') action(row, 'Remove friend', async () => { await call('/remove', { userId: item.user.id }); await renderSocial(currentUser); });
         action(row, 'Block', async () => { await call('/block', { userId: item.user.id }); await renderSocial(currentUser); });
+        action(row, 'Report player', () => reportUser(item.user.id));
         section.append(row);
       }
     }
     if (blocks.blocks.length) section.append(node('h3', 'Blocked accounts'));
     for (const entry of blocks.blocks) {
       const row = node('div', `Blocked account ${entry.userId.slice(0, 8)}`); row.className = 'version';
+      action(row, 'Report player', () => reportUser(entry.userId));
       action(row, 'Unblock', async () => { await call('/unblock', { userId: entry.userId }); await renderSocial(currentUser); }); section.append(row);
     }
   } catch (error) { if (turn === generation) status.textContent = error.message; }
 }
+import { reportUser } from './safety.js';

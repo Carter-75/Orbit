@@ -21,3 +21,7 @@ Verified:
 Still required: repeatable automated browser regression suite; pointer/touch flow verification; fresh independent creator upload/review/publish through UI; browser-level hostile package tests (cookies, parent access, requests/navigation/popups); mobile game movement; moderation/profile/admin workflows; startup/restart persistence in deployment; capacity testing; all financial and launch requirements. Do not describe this checkpoint as production-ready.
 
 Screenshots reviewed during this session reside under the local browser tool's temporary screenshots directory. These are local inspection evidence, not public promotional assets.
+
+## Moderation follow-up
+
+New disposable preview on loopback 3010/3011. Separate DemoPlayer and DemoModerator browser sessions completed: game Report button → populated target → case submission and reference → moderator open-case queue → internal reason plus distinct public reply → resolve → reporter page reload showing resolved status and public reply. Reporter DOM inspection for the internal-only note returned false. Page-error checks showed no errors in the tested sessions. Backend tests independently verify private field exclusion, ownership and concurrent decision conflicts. Creator build review UI and suspension confirmation were implemented but not exercised in this browser flow.

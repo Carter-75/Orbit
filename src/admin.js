@@ -33,6 +33,23 @@ export async function createAdmin({ db, config = {}, auth }) {
     res.json({ versions: queue });
   }));
   router.param('id', (_req, _res, next, id) => next(z.string().uuid().safeParse(id).success ? undefined : problem(404, 'Item not found.')));
+  router.get('/cases', run(async (_req, res) => {
+    const cases = await db.collection('reports').find({ status: 'open' }, { projection: {
+      _id: 1, reporterId: 1, kind: 1, category: 1, targetType: 1, targetId: 1, message: 1, status: 1, createdAt: 1,
+    } }).sort({ createdAt: 1 }).limit(100).toArray();
+    res.json({ cases: cases.map(({ _id, ...value }) => ({ id: _id, ...value })) });
+  }));
+  router.post('/cases/:id/resolve', run(async (req, res) => {
+    const { reason, publicReply, outcome } = input(reasonSchema.extend({
+      publicReply: z.string().trim().min(10).max(2000), outcome: z.enum(['resolved', 'dismissed']),
+    }), req.body);
+    const event = audit(req, `case.${outcome}`, reason);
+    const result = await db.collection('reports').updateOne({ _id: req.params.id, status: 'open' }, {
+      $set: { status: outcome, publicReply, resolvedAt: event.at, resolvedBy: req.user._id }, $push: { moderationHistory: event },
+    });
+    if (!result.modifiedCount) throw problem(409, 'This case was already handled or is unavailable.');
+    res.json({ case: { id: req.params.id, status: outcome } });
+  }));
   router.post('/versions/:id/review', run(async (req, res) => {
     const { decision, reason } = input(reviewSchema, req.body);
     const candidate = await versions.findOne({ _id: req.params.id, status: 'pending' }, { projection: { projectId: 1 } });
