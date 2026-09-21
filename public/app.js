@@ -1,4 +1,6 @@
 import { renderSocial } from './social.js';
+import { createGameBridge } from './game-bridge.js';
+let closeBridge;
 const $ = (selector) => document.querySelector(selector);
 let mode = 'login';
 let user = null;
@@ -21,6 +23,7 @@ async function api(path, body) {
   return data;
 }
 function displayAccount() {
+  if (!user) { closeBridge?.(); $('#game-frame').removeAttribute('src'); $('#play-area').hidden = true; }
   void renderSocial(user);
   $('#account-button').textContent = user ? user.username : 'Sign in';
   $('#account-panel').hidden = !user;
@@ -89,7 +92,13 @@ function renderGames() {
     const description = document.createElement('p'); description.textContent = game.description;
     card.append(title, description); area.append(card);
     const play = document.createElement('button'); play.textContent = 'Play';
-    play.onclick = () => user ? launchGame(game._id, undefined, game.title) : openAuth();
+    play.onclick = async () => {
+      if (!user) return openAuth();
+      play.disabled = true;
+      try { await launchGame(game._id, undefined, game.title); }
+      catch (error) { announce(error.message); }
+      finally { play.disabled = false; }
+    };
     card.append(play);
   }
 }
@@ -175,6 +184,8 @@ async function loadProject(id) {
 }
 async function launchGame(id, versionId, title) {
   const grant = await api(`/games/${id}/launch`, versionId ? { preview: true, versionId } : {});
+  closeBridge?.();
+  closeBridge = createGameBridge({ frame: $('#game-frame'), grant, user, api });
   $('#play-title').textContent = title; $('#game-frame').src = grant.url; $('#play-area').hidden = false; $('#play-area').scrollIntoView();
 }
-$('#close-game').onclick = () => { $('#game-frame').removeAttribute('src'); $('#play-area').hidden = true; };
+$('#close-game').onclick = () => { closeBridge?.(); $('#game-frame').removeAttribute('src'); $('#play-area').hidden = true; };

@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Star Garden — Orbit starter</title><link rel="stylesheet" href="game.css"><script src="orbit-sdk.js" defer></script><script src="game.js" defer></script></head>
+<body><main><header><div><p class="label">ORBIT · OPEN STARTER GAME</p><h1>Star Garden</h1></div><p id="score">Stars collected: 0</p></header>
+<p>Collect stars in a shared garden. Move with arrow keys, WASD, or the buttons below.</p>
+<div class="garden" id="garden" tabindex="0" role="application" aria-label="Star Garden playfield. Use arrow keys to move and collect stars."><div id="star" aria-hidden="true">✦</div><div id="players"></div></div>
+<div class="controls" aria-label="Movement"><button data-move="up" aria-label="Move up">↑</button><button data-move="left" aria-label="Move left">←</button><button data-move="down" aria-label="Move down">↓</button><button data-move="right" aria-label="Move right">→</button><button id="save">Save progress</button></div>
+<section><h2>Play together</h2><button id="create">Create room</button><label>Room code<input id="room-code" maxlength="64" autocomplete="off"></label><button id="join">Join room</button><button id="leave">Leave room</button><p id="room-status">Not connected to a room.</p><button id="hello">Say hello</button><p id="chat" aria-live="polite"></p></section>
+<p id="status" role="status">Connecting to Orbit…</p><p class="note">A starter, not a competitive game. Your position and score are client-controlled; saves are not a currency or purchase system.</p></main></body></html>

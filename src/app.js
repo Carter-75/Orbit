@@ -9,6 +9,7 @@ import { createLaunch } from './launch.js';
 import { createProjects } from './projects.js';
 import { createSocial } from './social.js';
 import { createAdmin } from './admin.js';
+import { createGameStorage } from './game-storage.js';
 
 export async function createApp({ db, config, sendMail }) {
   const app = express();
@@ -47,6 +48,7 @@ export async function createApp({ db, config, sendMail }) {
   app.use('/api/social', await createSocial({ db, config, auth }));
   app.use('/api/admin', await createAdmin({ db, config, auth }));
   app.use('/api/games', await createLaunch({ db, config, auth }));
+  app.use('/api/sdk', createGameStorage({ db, auth }));
   app.get('/api/platform', (_req, res) => res.json({
     name: 'Orbit', minimumAge: 13, publicLaunch: config.publicLaunch,
     capabilities: { email: Boolean(config.emailApiKey && config.emailFrom), ads: false, subscriptions: false },

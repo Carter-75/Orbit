@@ -18,7 +18,7 @@ export async function createLaunch({ db, config, auth }) {
     const expiresAt = new Date(Date.now() + 30 * 60000);
     await db.collection('launchGrants').insertOne({ _id: createHash('sha256').update(ticket).digest('hex'),
       projectId: project._id, versionId, userId: req.user._id, authVersion: req.user.authVersion, preview, expiresAt });
-    res.json({ url: `${config.assetOrigin}/play/${ticket}/${version.manifest.entry}`, expiresAt, manifest: version.manifest });
+    res.json({ grantId: createHash('sha256').update(ticket).digest('hex'), url: `${config.assetOrigin}/play/${ticket}/${version.manifest.entry}`, expiresAt, manifest: version.manifest });
   });
   return router;
 }
