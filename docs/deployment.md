@@ -40,4 +40,6 @@ If adding custom domains later, explicitly update both origin values through a r
 
 ## Verification status
 
+API rate limits currently use process-local memory. A coarse 1,200 requests/minute/IP limit runs before authentication; non-auth routes also enforce 120/minute per validated account or anonymous IP subnet. Authentication, social actions, invitations and reports retain their own tighter limits. The network cap is not a measured capacity claim: shared-network load and provider proxy behavior still require staging tests. Restarts reset counters, and multiple instances would need a shared limiter store. Rate-limit replies are JSON with retry information and no-store caching. The authenticated key is resolved server-side, never taken from an arbitrary cookie value. See [express-rate-limit configuration](https://github.com/express-rate-limit/express-rate-limit).
+
 The YAML is prepared using current provider documentation. Local parsing is not equivalent to a Render account-side Blueprint validation or live deployment. Those require a connected account and must be recorded separately. Cross-service URL resolution, outbound access, real email delivery, uptime, backup restoration and production load are release checks, not claims made by this document.

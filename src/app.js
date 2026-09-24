@@ -1,7 +1,7 @@
 import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { rateLimit } from 'express-rate-limit';
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { createAuth } from './auth.js';
@@ -31,7 +31,11 @@ export async function createApp({ db, config, sendMail }) {
     try { await db.command({ ping: 1 }); res.json({ status: 'ready' }); }
     catch { res.status(503).json({ status: 'database unavailable' }); }
   });
-  app.use('/api', rateLimit({ windowMs: 60000, limit: 120, standardHeaders: 'draft-8', legacyHeaders: false }));
+  // Coarse pre-authentication protection still bounds database work for shared
+  // networks. A tighter account/anonymous limit is enforced after authentication.
+  app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+  const rateMessage = { error: 'Too many requests. Please wait a minute and try again.' };
+  app.use('/api', rateLimit({ windowMs: 60000, limit: 1200, identifier: 'network', standardHeaders: 'draft-8', legacyHeaders: false, message: rateMessage }));
   app.use('/api', (req, res, next) => {
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) && req.get('origin') !== config.appOrigin) {
       return res.status(403).json({ error: 'This action must originate from Orbit.' });
@@ -47,6 +51,9 @@ export async function createApp({ db, config, sendMail }) {
   });
   app.use('/api/auth', auth.router);
   app.use('/api', auth.authenticate);
+  app.use('/api', rateLimit({ windowMs: 60000, limit: 120, identifier: 'account-or-guest',
+    keyGenerator: req => req.user ? `user:${req.user._id}` : `guest:${ipKeyGenerator(req.ip)}`,
+    standardHeaders: 'draft-8', legacyHeaders: false, message: rateMessage }));
   app.use('/api/projects', await createProjects({ db, config, auth }));
   app.use('/api/social', await createSocial({ db, config, auth }));
   app.use('/api/admin', await createAdmin({ db, config, auth }));

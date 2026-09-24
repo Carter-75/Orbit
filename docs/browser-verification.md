@@ -22,6 +22,17 @@ Still required: repeatable automated browser regression suite; pointer/touch flo
 
 Screenshots reviewed during this session reside under the local browser tool's temporary screenshots directory. These are local inspection evidence, not public promotional assets.
 
+## Repeatable browser regression suite — September 24
+
+Run `npm run test:browser`. The test runner starts an isolated loopback platform/assets pair at 3040/3041 with disposable MongoDB and a generated Star Garden package validated through the production importer. The local default uses installed Google Chrome; CI installs Playwright Chromium. No production credentials or real accounts are used. Tests require those ports to be free. Explicit `ORBIT_REUSE_TEST_SERVER=true` is only for debugging against an already-running fixture; normal runs start fresh because tests intentionally change fixture accounts.
+
+The browser scenarios use separate cookie contexts and actual UI controls, not mocked APIs:
+
+- Two players sign in, request and accept friendship, enable opt-in online status, create a room, send and accept an invitation, automatically join the same room and exchange a preset greeting. The recipient blocks the sender. The test also checks iframe sandbox configuration, parent DOM denial, avatar dimensions and page errors. Backend tests cover blocking enforcement; this browser scenario does not yet wait for an existing blocked room to disconnect.
+- A creator creates a new draft, uploads the ZIP, previews and submits it. A different moderator previews the submitted build and approves it. The creator publishes; a third account discovers and plays it. Pending builds are not listed, and creator analytics shows the single other-player launch authorization while excluding staff previews.
+
+Both scenarios passed together in local Chrome against a fresh database (16.5 seconds, no retries, 15-second action timeouts). Initial combined runs exposed a shared-IP API quota problem and social reads consuming the mutation quota. API limits now distinguish authenticated accounts from guests behind a coarse network cap, all quota errors are JSON/no-store, and social read/write budgets are separate. Backend regressions check quota boundaries and forged-cookie behavior. Screenshots go to ignored `test-results/`; traces and failure screenshots are retained on failure. GitHub uploads test evidence for seven days. Visual review caught a stretched friend avatar caused by generic version-row styling; a scoped fixed-width rule and a size regression assertion were added. These checks are local regression evidence, not independent creator onboarding, production persistence, full accessibility, hostile-package security or financial verification.
+
 ## Moderation follow-up
 
 New disposable preview on loopback 3010/3011. Separate DemoPlayer and DemoModerator browser sessions completed: game Report button → populated target → case submission and reference → moderator open-case queue → internal reason plus distinct public reply → resolve → reporter page reload showing resolved status and public reply. Reporter DOM inspection for the internal-only note returned false. Page-error checks showed no errors in the tested sessions. Backend tests independently verify private field exclusion, ownership and concurrent decision conflicts. Creator build review UI and suspension confirmation were implemented but not exercised in this browser flow.

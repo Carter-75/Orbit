@@ -81,3 +81,11 @@ Full integrated rerun after authorization-version assertion: 32/32 tests passed 
 Implemented expiring friend-to-live-room invitations with permission/session/build/age/block/capacity checks, owner-only single acceptance and decline; trusted-host send/list/join controls; SDK bridge auto-join routing and live room callback; production/local room-directory integration. Targeted real-Mongo invitation tests passed and changed browser modules passed syntax checks. Browser automatic-join verification remains required, alongside presence verification. No external messages or invitations to real users were sent. Full remaining platform, finance, deployment and launch scope is unchanged.
 
 Integrated invitation checkpoint: all 33 local tests passed. Diff whitespace checks passed. Backend room-directory tests are controlled fixtures; actual two-browser invitation flow remains the next verification step.
+
+### Automated browser checkpoint
+
+Added Playwright with an automatically managed disposable two-origin preview, generated validated starter package, and separate cookie contexts. Local UI scenarios individually passed for friends/presence/invitation/automatic multiplayer joining and creator upload/preview/submission → separate moderator preview/approval → creator publishing → separate player discovery/launch. The latter verifies one real player launch authorization in creator analytics. Screenshot inspection identified and fixed a stretched social avatar; the regression test checks its dimensions. Added a separate GitHub Chromium browser job with retained test evidence. Full backend rerun passed 33/33. Clean combined browser and remote CI verification follow; no live deployment, charges, financial activation or promotional publication occurred. Full original goal remains active.
+
+Combined browser run exposed a 120/minute shared-IP quota and social refreshes exhausting the 30/minute action budget. Added coarse pre-auth network protection plus account/guest API quotas, JSON/no-store quota replies, and separate bounded social read/write quotas with regression tests. Clean combined Chrome rerun passed 2/2 in 16.5 seconds without retries. Remote GitHub browser verification remains a separate gate.
+
+Final local backend rerun for this checkpoint: 34/34 passed. Script syntax and diff whitespace checks passed.

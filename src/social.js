@@ -23,7 +23,13 @@ export async function createSocial({ db, config, auth }) {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('origin') !== origin) return res.status(403).json({ error: 'Request origin is not permitted.' });
     next();
   }));
-  router.use(rateLimit({ windowMs: 60000, limit: 30, keyGenerator: (req) => req.user._id, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Too many social requests. Try again shortly.' } }));
+  // Reading friends/presence must not consume the mutation budget needed for
+  // accepting requests or blocking. Both paths remain bounded per account.
+  const reading = req => ['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+  for (const readOnly of [true, false]) router.use(rateLimit({ windowMs: 60000, limit: readOnly ? 120 : 30,
+    skip: req => reading(req) !== readOnly, identifier: readOnly ? 'social-read' : 'social-write',
+    keyGenerator: req => req.user._id, standardHeaders: 'draft-8', legacyHeaders: false,
+    message: { error: 'Too many social requests. Try again shortly.' } }));
   const verified = (req, res, next) => req.user.emailVerified ? next() : res.status(403).json({ error: 'Verify your email first.' });
   const eligible = (a, b) => a.emailVerified && b.emailVerified && ['teen', 'adult'].includes(a.ageBand) && a.ageBand === b.ageBand;
   // Initial product policy: new friendships are restricted to the same age band.

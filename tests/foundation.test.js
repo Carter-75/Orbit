@@ -43,5 +43,15 @@ test('full app hides source, uses real database health and rejects cross-origin 
     assert.equal((await request(app).post('/api/auth/forgot-password').set('Origin', config.appOrigin).send({email:'fresh@example.test'})).status, 503);
     const closed = await createApp({ db: connection.db, config: { ...config, production: true, publicLaunch: false }, sendMail: null });
     assert.equal((await request(closed.app).post('/api/auth/register').set('Origin', config.appOrigin).send({})).status, 503);
+    // Guests sharing one network are bounded, but do not exhaust a signed-in
+    // account's quota. Forged cookies are not a separate rate-limit identity.
+    for (let i = 0; i < 119; i++) assert.equal((await request(app).get('/api/platform')).status, 200);
+    const limited = await request(app).get('/api/platform');
+    assert.equal(limited.status, 429);
+    assert.match(limited.body.error, /wait a minute/);
+    assert.equal(limited.headers['cache-control'], 'no-store');
+    assert.ok(limited.headers['retry-after']);
+    assert.equal((await request(app).get('/api/platform').set('Cookie', 'orbit_session=forged')).status, 429);
+    assert.equal((await request(app).get('/api/platform').set('Cookie', cookie)).status, 200);
   } finally { await client?.close(); await mongo.stop(); }
 });

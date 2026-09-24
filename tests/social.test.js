@@ -37,6 +37,16 @@ beforeEach(async () => {
 });
 after(async () => { await client?.close(); await mongo?.stop(); });
 
+test('social reads do not consume the independently bounded mutation quota', async () => {
+  for (let i = 0; i < 31; i++) assert.equal((await api('alice', 'get', '/friends')).status, 200);
+  for (let i = 0; i < 30; i++) assert.equal((await api('alice', 'patch', '/presence', { sharing: false })).status, 200);
+  assert.equal((await api('alice', 'patch', '/presence', { sharing: true })).status, 429);
+  assert.equal((await api('alice', 'get', '/friends')).status, 200);
+  for (let i = 0; i < 88; i++) assert.equal((await api('alice', 'get', '/friends')).status, 200);
+  assert.equal((await api('alice', 'get', '/friends')).status, 429);
+  assert.equal((await api('bobby', 'get', '/friends')).status, 200);
+});
+
 test('friendships require both verified peers, same age band and recipient acceptance', async () => {
   assert.equal((await api(null, 'get', '/friends')).status, 401);
   assert.equal((await api('alice', 'post', '/requests', { username: 'Alice' })).status, 404);
