@@ -1,0 +1,9 @@
+# Saved games and creator activity
+
+Players can save or remove published games and switch discovery to their private library. The account document stores up to 200 game IDs. Atomic insertion prevents duplicate/concurrent saves from exceeding the limit; repeat saves at capacity are idempotent. Removed, draft or suspended games do not expose their metadata in the library. They appear as removable unavailable placeholders so they cannot permanently occupy a player's slots. No public favorites list is exposed.
+
+Project owners can view daily counts for the last 30 UTC dates in Manage builds → View launch activity. The current metric is **public launch authorizations issued**, not confirmed plays, unique players, engagement, ad impressions or revenue. Repeat launches count again. Previews, the project's owner and administrator activity are excluded. Daily aggregate documents contain no player identifiers and expire after 90 days. Ordinary short-lived launch grants remain a separate authorization mechanism.
+
+Metrics are counted after a valid grant has been persisted and before the launch response. A client can abandon or fail to load the game after authorization; those authorizations still count. This is not an anti-fraud metric and must not be used for payouts. Analytics-storage failure currently causes a launch error after its short-lived grant was created; reliable event delivery and reconciliation remain future operational hardening.
+
+Local tests September 24: independent account isolation; Origin/input protection; hidden-game metadata exclusion; concurrent idempotent saves; race at 200-item quota; owner-only analytics; 30-day boundaries; concurrent increments; creator/admin/preview exclusions; absence of player IDs; and real launch-route integration. Targeted suite: 2/2 passed. Full integrated suite: 31/31 passed. UI implementation is present but browser verification of this checkpoint is still required.

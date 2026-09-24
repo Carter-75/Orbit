@@ -11,6 +11,7 @@ import { createSocial } from './social.js';
 import { createAdmin } from './admin.js';
 import { createGameStorage } from './game-storage.js';
 import { createSafety } from './safety.js';
+import { createLibrary } from './library.js';
 
 export async function createApp({ db, config, sendMail }) {
   const app = express();
@@ -49,6 +50,7 @@ export async function createApp({ db, config, sendMail }) {
   app.use('/api/social', await createSocial({ db, config, auth }));
   app.use('/api/admin', await createAdmin({ db, config, auth }));
   app.use('/api/safety', await createSafety({ db, config, auth }));
+  app.use('/api/library', createLibrary({ db, config, auth }));
   app.use('/api/games', await createLaunch({ db, config, auth }));
   app.use('/api/sdk', createGameStorage({ db, auth }));
   app.get('/api/platform', (_req, res) => res.json({

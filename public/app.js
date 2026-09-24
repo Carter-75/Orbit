@@ -6,6 +6,26 @@ const $ = (selector) => document.querySelector(selector);
 let mode = 'login';
 let user = null;
 let games = [];
+let favoriteIds = new Set(), favoriteGames = [], showFavorites = false, libraryGeneration = 0;
+const libraryToggle = document.createElement('button');
+libraryToggle.textContent = 'Show my saved games'; libraryToggle.hidden = true;
+libraryToggle.setAttribute('aria-pressed', 'false');
+$('#games').before(libraryToggle);
+libraryToggle.onclick = () => {
+  showFavorites = !showFavorites; libraryToggle.setAttribute('aria-pressed', String(showFavorites));
+  libraryToggle.textContent = showFavorites ? 'Show all games' : 'Show my saved games'; renderGames();
+};
+async function loadLibrary() {
+  const generation = ++libraryGeneration;
+  try {
+    const result = await api('/library/favorites');
+    if (generation !== libraryGeneration || !user) return;
+    favoriteIds = new Set(result.ids); favoriteGames = result.games;
+    const visibleIds = new Set(result.games.map(game => game._id));
+    favoriteGames.push(...result.ids.filter(id => !visibleIds.has(id)).map(_id => ({ _id, title: 'Unavailable saved game', description: 'This game is no longer available. You can remove it from your library.', unavailable: true })));
+    renderGames();
+  } catch (error) { if (generation === libraryGeneration && user) announce(error.message); }
+}
 let statusTimer;
 let resetToken;
 function announce(text) {
@@ -24,6 +44,9 @@ async function api(path, body) {
   return data;
 }
 function displayAccount() {
+  libraryGeneration++; favoriteIds = new Set(); favoriteGames = []; showFavorites = false;
+  libraryToggle.hidden = !user; libraryToggle.textContent = 'Show my saved games'; libraryToggle.setAttribute('aria-pressed', 'false');
+  renderGames(); if (user) void loadLibrary();
   renderSafety(user); void renderModeration(user, launchGame);
   if (!user) { closeBridge?.(); $('#game-frame').removeAttribute('src'); $('#play-area').hidden = true; }
   void renderSocial(user);
@@ -81,11 +104,12 @@ $('#forgot').onclick = async () => {
 function renderGames() {
   const area = $('#games'); area.replaceChildren();
   const query = $('#search').value.toLowerCase();
-  const matches = games.filter(game => `${game.title} ${game.description}`.toLowerCase().includes(query));
+  const matches = (showFavorites ? favoriteGames : games).filter(game => `${game.title} ${game.description}`.toLowerCase().includes(query));
   if (!matches.length) {
     const empty = document.createElement('div'); empty.className = 'empty';
     const title = document.createElement('h3'); title.textContent = query ? 'No matching games yet.' : 'A new universe starts small.';
     const copy = document.createElement('p'); copy.textContent = query ? 'Try another search.' : 'The first creator games will appear here after review and publication. There are no published games yet.';
+    if (showFavorites && !query) { title.textContent = 'Keep your favorites close.'; copy.textContent = 'Save games from discovery to find them here. Unavailable games are hidden.'; }
     empty.append(title, copy); area.append(empty); return;
   }
   for (const game of matches) {
@@ -101,9 +125,18 @@ function renderGames() {
       catch (error) { announce(error.message); }
       finally { play.disabled = false; }
     };
-    card.append(play);
+    if (!game.unavailable) card.append(play);
     const report = document.createElement('button'); report.textContent = 'Report';
-    report.onclick = () => user ? reportGame(game._id) : openAuth(); card.append(report);
+    report.onclick = () => user ? reportGame(game._id) : openAuth(); if (!game.unavailable) card.append(report);
+    if (user) {
+      const save = document.createElement('button'); const saved = favoriteIds.has(game._id);
+      save.textContent = saved ? 'Remove from saved' : 'Save game'; save.setAttribute('aria-pressed', String(saved));
+      save.onclick = async () => {
+        save.disabled = true;
+        try { await api('/library/favorites', { projectId: game._id, saved: !saved }); await loadLibrary(); announce(saved ? 'Removed from your library.' : 'Saved to your library.'); }
+        catch (error) { announce(error.message); } finally { save.disabled = false; }
+      }; card.append(save);
+    }
   }
 }
 $('#search').oninput = renderGames;
@@ -162,6 +195,20 @@ async function loadProject(id) {
   try {
     const { project, versions } = await api(`/projects/${id}`); const area = $('#project-detail'); area.replaceChildren();
     area.append(element('h2', project.title), element('p', 'Upload a browser ZIP with orbit.json and an HTML entry. Up to 10 MB compressed, 30 MB expanded; builds go through review before publication.'));
+    const analytics = element('div'); const analyticsButton = element('button', 'View launch activity');
+    analyticsButton.onclick = async () => {
+      analyticsButton.disabled = true;
+      try {
+        const result = await api(`/projects/${id}/analytics`);
+        analytics.replaceChildren(element('h3', `${result.total} public launch authorizations · last 30 days`), element('p', result.description));
+        const details = document.createElement('details'); details.append(element('summary', 'Daily counts (UTC)'));
+        const table = document.createElement('table'), header = document.createElement('tr');
+        header.append(element('th', 'Date'), element('th', 'Launch authorizations')); table.append(header);
+        for (const day of result.days) { const row = document.createElement('tr'); row.append(element('td', day.day), element('td', String(day.launchGrants))); table.append(row); }
+        details.append(table); analytics.append(details);
+      } catch (error) { analytics.textContent = error.message; } finally { analyticsButton.disabled = false; }
+    };
+    area.append(analyticsButton, analytics);
     const form = document.createElement('form'); form.className = 'upload-form';
     const label = element('label', 'Game package (.zip)'); const input = document.createElement('input');
     input.type = 'file'; input.accept = '.zip'; input.required = true; label.append(input);

@@ -4,6 +4,7 @@ import { Binary } from 'mongodb';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { validatePackage, PACKAGE_LIMITS } from './packages.js';
+import { readAnalytics } from './analytics.js';
 
 const PROJECT_LIMIT = 20, VERSION_LIMIT = 20, VALIDATION_LIMIT = 2;
 let activeUploads = 0;
@@ -59,6 +60,9 @@ export async function createProjects({ db, config = {}, auth }) {
     const builds = await versions.find({ projectId: req.project._id, ownerId: req.user._id }).sort({ createdAt: -1 }).limit(VERSION_LIMIT).toArray();
     res.json({ project: view(req.project), versions: builds.map(view) });
   }));
+  router.get('/:id/analytics', run(async (req, res) => {
+    res.json(await readAnalytics(db, req.project._id));
+  }));
   router.post('/:id/versions', run(async (req, res) => {
     if (activeUploads >= VALIDATION_LIMIT) throw failure(503, 'Upload processing is busy. Try again shortly.');
     activeUploads++;
@@ -105,7 +109,7 @@ export async function createProjects({ db, config = {}, auth }) {
     if (!parsed.success) throw failure(400, 'Select a valid version.');
     const version = await versions.findOne({ _id: parsed.data.versionId, projectId: req.params.id, ownerId: req.user._id, status: 'approved' });
     if (!version) throw failure(409, 'This version has not been approved for publishing.');
-    const project = await projects.findOneAndUpdate(writableFilter(req), { $set: { publishedVersion: version._id, status: 'published', updatedAt: new Date() } }, { returnDocument: 'after' });
+    const project = await projects.findOneAndUpdate(writableFilter(req), { $set: { publishedVersion: version._id, status: 'published', publishedAt: new Date(), updatedAt: new Date() } }, { returnDocument: 'after' });
     if (!project) throw failure(403, 'Project is not writable.');
     res.json({ project: view(project) });
   });

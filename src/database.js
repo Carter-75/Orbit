@@ -13,6 +13,8 @@ export async function connectDatabase(config) {
     db.collection('relationships').createIndex({ from: 1, to: 1 }, { unique: true }),
     db.collection('reports').createIndex({ status: 1, createdAt: -1 }),
     db.collection('audit').createIndex({ createdAt: -1 }),
+    db.collection('gameMetrics').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection('gameMetrics').createIndex({ projectId: 1, day: 1 }),
   ]);
   return { client, db };
 }

@@ -61,3 +61,9 @@ Follow-up evidence: complete backend suite passed 28/28. Added Star Garden edita
 Implemented player reports/support with private request history and public responses; game/social reporting entry points; moderator build-preview/review and report-response/suspension UI; atomic audited case decisions and permission/input/privacy tests. Real browser flow verified a local report submitted by DemoPlayer, resolved by DemoModerator, and returned as a public reply without internal notes. Full local suite: 29/29 passed. Added docs/moderation.md with operating gaps.
 
 GitHub run 35596952599 for 7b605ca exposed a realtime cleanup timing failure (27/28 passed): client close preceded server room cleanup on Linux. Fixed runtime revocation to remove membership before closing, and prevented asynchronous joins from re-adding already-closed sockets. Local full suite passed after fix; remote follow-up required. Local moderation preview on ports 3010/3011 because older preview still held 3000/3001 and its attempted process stop failed. Both are disposable, not deployments.
+
+Follow-up: moderation and cleanup commit 37c365f pushed; GitHub run 35633042840 passed all checks, including tests and production dependency audit.
+
+### Library and analytics, September 24
+
+Added private saved games (200 per account, atomic quota and duplicate protection), discovery/library toggle and removal controls including unavailable-game placeholders. Added owner-only 30-day daily launch-authorization counts excluding previews/owner/admin activity, with 90-day aggregate retention and no player identifiers in metrics. Explicit labels do not equate authorization with confirmed play, unique players, engagement or earnings. Publishing now sets publishedAt for discovery ordering. Full local suite 31/31 passed; browser verification of these new controls remains. See library-analytics.md for semantics and limitations. All broader outstanding goal requirements remain active.
