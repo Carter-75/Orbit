@@ -1,19 +1,20 @@
 // The trusted parent owns credentials. Sandboxed games only receive a private
 // MessagePort; neither session cookies nor launch grants cross this boundary.
-export function createGameBridge({ frame, grant, user, api }) {
+export function createGameBridge({ frame, grant, user, api, initialRoom, onRoom = () => {} }) {
   let closed = false, port, socket, windowStart = Date.now(), calls = 0, pending = 0;
   const capabilities = new Set(grant.manifest.capabilities || []);
   const emit = message => { if (!closed && port) port.postMessage(message); };
-  function disconnect() { if (socket) { socket.close(); socket = null; } }
+  function disconnect() { onRoom(null); if (socket) { socket.close(); socket = null; } }
   function connect() {
     if (socket) return socket;
     const url = new URL('/ws', location.href); url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     socket = new WebSocket(url);
     const current = socket;
     current.onmessage = event => {
-      try { emit({ event: 'multiplayer', data: JSON.parse(event.data) }); } catch { /* Invalid server frame. */ }
+      if (closed || socket !== current) return;
+      try { const data = JSON.parse(event.data); if (data.type === 'room') onRoom(data.roomId); emit({ event: 'multiplayer', data }); } catch { /* Invalid server frame. */ }
     };
-    current.onclose = () => { if (socket === current) socket = null; emit({ event: 'multiplayer', data: { type: 'disconnected' } }); };
+    current.onclose = () => { if (socket !== current || closed) return; socket = null; onRoom(null); emit({ event: 'multiplayer', data: { type: 'disconnected' } }); };
     current.onerror = () => emit({ event: 'multiplayer', data: { type: 'error', error: 'Connection failed.' } });
     return current;
   }
@@ -59,6 +60,7 @@ export function createGameBridge({ frame, grant, user, api }) {
     // '*' is necessary for an opaque sandbox origin. Transfer only a revocable
     // constrained port to this exact frame, not an auth token or a wildcard listener.
     frame.contentWindow.postMessage({ type: 'orbit:connected' }, '*', [channel.port2]);
+    if (initialRoom) void request({ method: 'multiplayer.join', params: { roomId: initialRoom } }).catch(error => emit({ event: 'multiplayer', data: { type: 'error', error: error.message } }));
   }
   window.addEventListener('message', ready);
   return () => { closed = true; window.removeEventListener('message', ready); port?.close(); disconnect(); };

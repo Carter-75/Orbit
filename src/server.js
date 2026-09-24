@@ -17,6 +17,7 @@ try {
   mailTimer.unref();
   const server = http.createServer(app);
   const realtime = attachRealtime({ server, db, config, auth });
+  app.locals.realtime = realtime;
   server.listen(config.port, '0.0.0.0', () => {
     console.log(JSON.stringify({ event: 'listening', port: config.port, publicLaunch: config.publicLaunch }));
   });

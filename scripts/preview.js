@@ -21,6 +21,7 @@ if (demoFlag !== -1) {
 const server = http.createServer(app);
 const assetServer = http.createServer(createAssetApp({ db, config }));
 const realtime = attachRealtime({ server, db, config, auth });
+app.locals.realtime = realtime;
 assetServer.listen(port + 1, '127.0.0.1');
 server.listen(config.port, '127.0.0.1', () => console.log(`Orbit development preview at ${config.appOrigin}; temporary database, email unavailable.`));
 let stopping = false;

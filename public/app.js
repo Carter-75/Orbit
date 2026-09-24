@@ -1,5 +1,6 @@
 import { renderSocial } from './social.js';
 import { renderProfile } from './profile.js';
+import { renderInvitations, setInvitationRoom } from './invitations.js';
 import { createGameBridge } from './game-bridge.js';
 import { renderSafety, reportGame, renderModeration } from './safety.js';
 let closeBridge;
@@ -45,6 +46,7 @@ async function api(path, body) {
   return data;
 }
 function displayAccount() {
+  void renderInvitations(user, api, launchGame);
   void renderProfile(user, profile => { if (user?.id === profile.id) user = { ...user, avatar: profile.avatar }; });
   libraryGeneration++; favoriteIds = new Set(); favoriteGames = []; showFavorites = false;
   libraryToggle.hidden = !user; libraryToggle.textContent = 'Show my saved games'; libraryToggle.setAttribute('aria-pressed', 'false');
@@ -235,10 +237,12 @@ async function loadProject(id) {
     }
   } catch (error) { announce(error.message); }
 }
-async function launchGame(id, versionId, title) {
+async function launchGame(id, versionId, title, roomId) {
   const grant = await api(`/games/${id}/launch`, versionId ? { preview: true, versionId } : {});
   closeBridge?.();
-  closeBridge = createGameBridge({ frame: $('#game-frame'), grant, user, api });
+  setInvitationRoom(null);
+  closeBridge = createGameBridge({ frame: $('#game-frame'), grant, user, api, initialRoom: roomId,
+    onRoom: activeRoom => setInvitationRoom(versionId ? null : activeRoom) });
   $('#play-title').textContent = title; $('#game-frame').src = grant.url; $('#play-area').hidden = false; $('#play-area').scrollIntoView();
 }
 $('#close-game').onclick = () => { closeBridge?.(); $('#game-frame').removeAttribute('src'); $('#play-area').hidden = true; };

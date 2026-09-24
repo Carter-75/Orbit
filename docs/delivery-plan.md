@@ -75,3 +75,9 @@ Follow-up: 0864bf9 passed GitHub run 36024893788. Added profile editor with six 
 Added opt-in friend-only online status, default off, 90-second expiry, visible-page polling and logout cleanup. Reads enforce verified/current accounts, accepted unblocked relationships, matching age bands (including pending adult transition), and current authorization version. No last-seen/history/game/room data is exposed. UI includes sharing choice and ambiguous private/offline labels. Targeted auth/social suite passed 10/10 before adding the explicit authorization-version assertion; full rerun follows. Browser presence and actual game invitation lifecycle remain required. See presence.md for policy and limitations.
 
 Full integrated rerun after authorization-version assertion: 32/32 tests passed locally. Public social module syntax and diff whitespace checks passed. This does not constitute browser or production verification of online status.
+
+### Game invitation checkpoint
+
+Implemented expiring friend-to-live-room invitations with permission/session/build/age/block/capacity checks, owner-only single acceptance and decline; trusted-host send/list/join controls; SDK bridge auto-join routing and live room callback; production/local room-directory integration. Targeted real-Mongo invitation tests passed and changed browser modules passed syntax checks. Browser automatic-join verification remains required, alongside presence verification. No external messages or invitations to real users were sent. Full remaining platform, finance, deployment and launch scope is unchanged.
+
+Integrated invitation checkpoint: all 33 local tests passed. Diff whitespace checks passed. Backend room-directory tests are controlled fixtures; actual two-browser invitation flow remains the next verification step.
