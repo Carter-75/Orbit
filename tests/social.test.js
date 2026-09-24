@@ -33,6 +33,7 @@ beforeEach(async () => {
     cookies[user._id] = `orbit_session=${token}`;
   }
   app = express(); app.use(express.json(), auth.authenticate); app.use('/api/social', await createSocial({ db, config: { appOrigin: origin }, auth }));
+  app.use('/api/auth', auth.router);
 });
 after(async () => { await client?.close(); await mongo?.stop(); });
 
@@ -98,4 +99,34 @@ test('profiles enforce presets and plain bounded text without privilege fields',
   await db.collection('users').updateOne({ _id: 'bobby' }, { $set: { suspended: true } });
   assert.equal((await api('alice', 'get', '/search?username=Bobby')).body.user, null);
   assert.equal((await api('bobby', 'get', '/friends')).status, 401);
+});
+
+test('presence is opt-in, friend-only, age-aware, expiring, block-safe and cleared by logout', async () => {
+  assert.deepEqual((await api('alice', 'get', '/presence')).body, { sharing: false, onlineFriendIds: [] });
+  assert.equal((await api('alice', 'post', '/presence/heartbeat', {})).body.sharing, false);
+  assert.equal((await db.collection('users').findOne({ _id: 'alice' })).presenceExpiresAt, undefined);
+  assert.equal((await api('alice', 'patch', '/presence', { sharing: true, userId: 'bobby' })).status, 400);
+  assert.equal((await request(app).patch('/api/social/presence').set('Cookie', cookies.alice).set('Origin', 'https://wrong.example').send({ sharing: true })).status, 403);
+  assert.equal((await api('alice', 'patch', '/presence', { sharing: true })).status, 200);
+  await api('alice', 'post', '/presence/heartbeat', {});
+  assert.deepEqual((await api('bobby', 'get', '/presence')).body.onlineFriendIds, []);
+  const created = await api('alice', 'post', '/requests', { username: 'Bobby' });
+  await api('bobby', 'post', `/requests/${created.body.requestId}/accept`, {});
+  assert.deepEqual((await api('bobby', 'get', '/presence')).body.onlineFriendIds, ['alice']);
+  assert.deepEqual((await api('carol', 'get', '/presence')).body.onlineFriendIds, []);
+  await db.collection('users').updateOne({ _id: 'alice' }, { $inc: { authVersion: 1 } });
+  assert.deepEqual((await api('bobby', 'get', '/presence')).body.onlineFriendIds, []);
+  await db.collection('users').updateOne({ _id: 'alice' }, { $set: { authVersion: 0 } }); // Restore the test fixture's session.
+  await db.collection('users').updateOne({ _id: 'alice' }, { $set: { adultAt: new Date(Date.now() - 1000) } });
+  assert.deepEqual((await api('bobby', 'get', '/presence')).body.onlineFriendIds, []);
+  await db.collection('users').updateOne({ _id: 'alice' }, { $unset: { adultAt: '' }, $set: { presenceExpiresAt: new Date(Date.now() - 1000) } });
+  assert.deepEqual((await api('bobby', 'get', '/presence')).body.onlineFriendIds, []);
+  await api('alice', 'post', '/presence/heartbeat', {});
+  await api('alice', 'patch', '/presence', { sharing: false });
+  assert.deepEqual((await api('bobby', 'get', '/presence')).body.onlineFriendIds, []);
+  await api('alice', 'patch', '/presence', { sharing: true }); await api('alice', 'post', '/presence/heartbeat', {});
+  await api('bobby', 'post', '/block', { userId: 'alice' });
+  assert.deepEqual((await api('bobby', 'get', '/presence')).body.onlineFriendIds, []);
+  const logout = await request(app).post('/api/auth/logout').set('Cookie', cookies.alice).set('Origin', origin).send({}); assert.equal(logout.status, 200);
+  assert.equal((await db.collection('users').findOne({ _id: 'alice' })).presenceExpiresAt, undefined);
 });

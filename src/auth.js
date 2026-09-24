@@ -133,7 +133,10 @@ export async function createAuth({ db, config = {}, sendMail }) {
   const requireUser = (req, res, next) => req.user ? next() : res.status(401).json({ error: 'Sign in to continue.' });
   async function clearSession(req, res) {
     const value = cookieValue(req.headers.cookie);
-    if (value) await sessions.deleteOne({ _id: digest(value) });
+    if (value) {
+      const removed = await sessions.findOneAndDelete({ _id: digest(value) });
+      if (removed) await users.updateOne({ _id: removed.userId }, { $unset: { presenceExpiresAt: '' } });
+    }
     res.clearCookie(cookieName, cookieOptions);
   }
   async function startSession(req, res, user) {

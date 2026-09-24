@@ -39,6 +39,33 @@ export async function createSocial({ db, config, auth }) {
     return id;
   }
   router.get('/profile', (req, res) => res.json({ user: safeUser(req.user) }));
+  router.get('/presence', wrap(async (req, res) => {
+    const result = { sharing: req.user.sharePresence === true, onlineFriendIds: [] };
+    if (!req.user.emailVerified) return res.json(result);
+    const relationships = await pairs.find({ members: req.user._id, status: 'accepted', blockedBy: { $size: 0 } }).limit(200).toArray();
+    const ids = relationships.map(pair => pair.members.find(id => id !== req.user._id));
+    const now = new Date();
+    const active = await users.find({ _id: { $in: ids }, emailVerified: true, suspended: { $ne: true }, sharePresence: true, presenceExpiresAt: { $gt: now }, $expr: { $eq: ['$presenceAuthVersion', '$authVersion'] } }, {
+      projection: { _id: 1, ageBand: 1, adultAt: 1 },
+    }).toArray();
+    result.onlineFriendIds = active.filter(other => {
+      const ageBand = other.ageBand === 'teen' && other.adultAt && other.adultAt <= now ? 'adult' : other.ageBand;
+      return ageBand === req.user.ageBand;
+    }).map(other => other._id);
+    res.json(result);
+  }));
+  router.patch('/presence', verified, wrap(async (req, res) => {
+    if (!req.body || Object.keys(req.body).length !== 1 || typeof req.body.sharing !== 'boolean') return res.status(400).json({ error: 'Choose whether to share your online status.' });
+    const sharing = req.body.sharing;
+    await users.updateOne({ _id: req.user._id }, { $set: { sharePresence: sharing }, $unset: { presenceExpiresAt: '' } });
+    res.json({ sharing });
+  }));
+  router.post('/presence/heartbeat', verified, wrap(async (req, res) => {
+    const updated = await users.updateOne({ _id: req.user._id, authVersion: req.user.authVersion, sharePresence: true, suspended: { $ne: true } }, {
+      $set: { presenceExpiresAt: new Date(Date.now() + 90000), presenceAuthVersion: req.user.authVersion },
+    });
+    res.json({ sharing: updated.matchedCount === 1 });
+  }));
   router.patch('/profile', verified, wrap(async (req, res) => {
     const body = req.body || {};
     if (!Object.keys(body).length || Object.keys(body).some((key) => !['avatar', 'biography'].includes(key)) || ('avatar' in body && !AVATARS.has(body.avatar)) || ('biography' in body && (typeof body.biography !== 'string' || body.biography.length > 160 || /[<>\u0000-\u001f]/.test(body.biography)))) return res.status(400).json({ error: 'Choose a supported avatar and a plain-text biography up to 160 characters.' });
