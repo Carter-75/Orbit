@@ -1,4 +1,5 @@
 import { renderSocial } from './social.js';
+import { renderProfile } from './profile.js';
 import { createGameBridge } from './game-bridge.js';
 import { renderSafety, reportGame, renderModeration } from './safety.js';
 let closeBridge;
@@ -44,6 +45,7 @@ async function api(path, body) {
   return data;
 }
 function displayAccount() {
+  void renderProfile(user, profile => { if (user?.id === profile.id) user = { ...user, avatar: profile.avatar }; });
   libraryGeneration++; favoriteIds = new Set(); favoriteGames = []; showFavorites = false;
   libraryToggle.hidden = !user; libraryToggle.textContent = 'Show my saved games'; libraryToggle.setAttribute('aria-pressed', 'false');
   renderGames(); if (user) void loadLibrary();
@@ -109,7 +111,7 @@ function renderGames() {
     const empty = document.createElement('div'); empty.className = 'empty';
     const title = document.createElement('h3'); title.textContent = query ? 'No matching games yet.' : 'A new universe starts small.';
     const copy = document.createElement('p'); copy.textContent = query ? 'Try another search.' : 'The first creator games will appear here after review and publication. There are no published games yet.';
-    if (showFavorites && !query) { title.textContent = 'Keep your favorites close.'; copy.textContent = 'Save games from discovery to find them here. Unavailable games are hidden.'; }
+    if (showFavorites && !query) { title.textContent = 'Keep your favorites close.'; copy.textContent = 'Save games from discovery to find them here.'; }
     empty.append(title, copy); area.append(empty); return;
   }
   for (const game of matches) {

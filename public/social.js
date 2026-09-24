@@ -1,4 +1,5 @@
 const section = document.createElement('section');
+import { avatarBadge } from './profile.js';
 section.id = 'social'; section.hidden = true;
 document.querySelector('#account-panel').after(section);
 const nav = document.createElement('a'); nav.href = '#social'; nav.textContent = 'Friends';
@@ -41,6 +42,8 @@ export async function renderSocial(user) {
       if (!relations[key].length) section.append(node('p', 'Nothing here yet.'));
       for (const item of relations[key]) {
         const row = node('div', item.user.username); row.className = 'version';
+        row.prepend(avatarBadge(item.user));
+        if (item.user.biography) row.append(node('small', item.user.biography));
         if (key === 'incoming') {
           action(row, 'Accept', async () => { await call(`/requests/${item.id}/accept`, {}); await renderSocial(currentUser); });
           action(row, 'Decline', async () => { await call(`/requests/${item.id}/reject`, {}); await renderSocial(currentUser); });
