@@ -89,3 +89,11 @@ Added Playwright with an automatically managed disposable two-origin preview, ge
 Combined browser run exposed a 120/minute shared-IP quota and social refreshes exhausting the 30/minute action budget. Added coarse pre-auth network protection plus account/guest API quotas, JSON/no-store quota replies, and separate bounded social read/write quotas with regression tests. Clean combined Chrome rerun passed 2/2 in 16.5 seconds without retries. Remote GitHub browser verification remains a separate gate.
 
 Final local backend rerun for this checkpoint: 34/34 passed. Script syntax and diff whitespace checks passed.
+
+Remote evidence: commit 27ee58a passed GitHub run 36028654728, including the separate Linux Chromium browser job and backend tests/audit.
+
+### Payment-event foundation, September 27
+
+Using the payments skill and current primary Stripe references, added disabled-by-default test-only configuration, raw signed webhook intake, minimal durable event references, duplicate protection, leased canonical-event retrieval, bounded retry/exhaustion states and admin-only diagnostics. Seven targeted local tests passed against real MongoDB and real Stripe signature verification with a stubbed retrieval provider. No live keys are accepted; no checkout, entitlement, ledger or payout handler is installed, and no Stripe account was connected. Full backend rerun follows. See payment-events.md for exact contract and limitations. Financial integrations, deployment, promotion and the rest of the original objective remain unfinished.
+
+Final checkpoint evidence: expanded payment suite 9/9 passed; full integrated suite 44/44 passed; production dependency audit reported zero vulnerabilities after authorized network access (the initial restricted-network audit failed, not a security finding). Syntax and diff checks passed. Asked for the business operating country to guide upcoming provider integration; independent work is not blocked on that answer.

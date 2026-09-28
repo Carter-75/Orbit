@@ -13,6 +13,7 @@ import { createGameStorage } from './game-storage.js';
 import { createSafety } from './safety.js';
 import { createLibrary } from './library.js';
 import { createInvitations } from './invitations.js';
+import { createStripeEvents } from './stripe-events.js';
 
 export async function createApp({ db, config, sendMail }) {
   const app = express();
@@ -31,6 +32,10 @@ export async function createApp({ db, config, sendMail }) {
     try { await db.command({ ping: 1 }); res.json({ status: 'ready' }); }
     catch { res.status(503).json({ status: 'database unavailable' }); }
   });
+  // Stripe signs its exact raw body and does not send a browser Origin. Only
+  // this dedicated endpoint bypasses browser CSRF checks and JSON parsing.
+  const paymentEvents = await createStripeEvents({ db, config: config.payments });
+  app.use('/api/payments/webhook', paymentEvents.router);
   // Coarse pre-authentication protection still bounds database work for shared
   // networks. A tighter account/anonymous limit is enforced after authentication.
   app.use('/api', (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
@@ -83,5 +88,5 @@ export async function createApp({ db, config, sendMail }) {
     if (status === 500) console.error(JSON.stringify({ event: 'request_failed', requestId: req.requestId, errorType: error.name }));
     res.status(status).json({ error: invalid ? 'Please check the submitted fields.' : status === 413 ? 'Request is too large.' : 'Something went wrong. Please try again.', requestId: req.requestId });
   });
-  return { app, auth };
+  return { app, auth, paymentEvents };
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { readPaymentConfig } from './payment-config.js';
 
 export function readConfig(env = process.env) {
   const production = env.NODE_ENV === 'production';
@@ -20,5 +21,6 @@ export function readConfig(env = process.env) {
     publicLaunch: env.PUBLIC_LAUNCH === 'true',
     emailApiKey: env.RESEND_API_KEY || '',
     emailFrom: env.EMAIL_FROM || '',
+    payments: readPaymentConfig(env),
   };
 }

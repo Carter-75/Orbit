@@ -41,6 +41,16 @@ test('ordinary creators cannot approve; verified current admin and exact origin 
   assert.equal((await post(`/versions/${versionId}/review`, { decision: 'approve', reason: 'short' })).status, 400);
   assert.equal((await db.collection('versions').findOne({ _id: versionId })).status, 'pending');
 });
+
+test('payment inbox is admin-only and excludes provider payloads, account mappings and leases', async () => {
+  await db.collection('stripeEvents').insertOne({ _id: 'fixture-event', eventId: 'evt_one', type: 'invoice.paid', mode: 'test',
+    status: 'awaiting_handler', attempts: 0, receivedAt: new Date(), account: 'acct_PRIVATE', leaseToken: 'NEVER-EXPOSE', data: { secret: 'NEVER-EXPOSE' } });
+  assert.equal((await request(app).get('/api/admin/payment-events').set('X-Test-User', owner)).status, 403);
+  const result = await request(app).get('/api/admin/payment-events').set('X-Test-User', admin);
+  assert.equal(result.status, 200); assert.equal(result.body.counts.awaiting_handler, 1);
+  assert.equal(result.body.events[0].eventId, 'evt_one'); assert.equal(result.text.includes('NEVER-EXPOSE'), false);
+  assert.equal(result.text.includes('acct_PRIVATE'), false);
+});
 test('queue projects minimal metadata, review is conditional and audit is atomic', async () => {
   const { versionId } = await pending();
   const queue = await request(app).get('/api/admin/queue').set('X-Test-User', admin);

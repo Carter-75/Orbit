@@ -32,6 +32,17 @@ export async function createAdmin({ db, config = {}, auth }) {
     ]).toArray();
     res.json({ versions: queue });
   }));
+  router.get('/payment-events', run(async (_req, res) => {
+    const inbox = db.collection('stripeEvents');
+    const [counts, events] = await Promise.all([
+      inbox.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]).toArray(),
+      inbox.find({}, { projection: { _id: 1, eventId: 1, type: 1, mode: 1, status: 1, attempts: 1,
+        receivedAt: 1, completedAt: 1, failureCode: 1 } }).sort({ receivedAt: -1 }).limit(50).toArray(),
+    ]);
+    res.json({ mode: config.payments?.mode || 'disabled', counts: Object.fromEntries(counts.map(row => [row._id, row.count])),
+      events: events.map(({ _id, ...value }) => ({ id: _id, ...value })),
+      notice: 'Event intake is not payment fulfillment. No balances, payouts or subscription access are granted by receiving an event.' });
+  }));
   router.param('id', (_req, _res, next, id) => next(z.string().uuid().safeParse(id).success ? undefined : problem(404, 'Item not found.')));
   router.get('/cases', run(async (_req, res) => {
     const cases = await db.collection('reports').find({ status: 'open' }, { projection: {

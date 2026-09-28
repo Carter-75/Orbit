@@ -9,6 +9,8 @@ An independent creator game platform under active construction. Target audience:
 - Separate asset service with sandboxed content and expiring launch grants. Draft previews require creator/admin ownership. No platform static source serving.
 - Responsive discovery/account/creator screens using real data. Published catalog starts empty.
 - Render Blueprint and GitHub checks. These remain deployment preparation, not proof of a live deployment.
+- Authenticated social play, invitations, creator publication and separate-player browser regression checks.
+- Test-only signed Stripe event intake and durable retry foundation; see [payment-event status](docs/payment-events.md). Checkout, paid access and payouts are not yet enabled or implemented.
 
 ## Local development
 
@@ -20,6 +22,6 @@ For an explicit temporary development preview without your own database, run `no
 
 See [delivery plan](docs/delivery-plan.md), [deployment guide](docs/deployment.md), [account contract](docs/accounts.md), [hosting/monetization research](docs/research-hosting-monetization.md), and [product/security research](docs/research-product-security.md).
 
-Remaining goal work includes complete moderation/social UI, SDK and example games, authenticated realtime multiplayer, teen-specific controls, provider monetization integrations, operational/load/browser verification, production deployment, ChatGPT integration evaluation and promotional artifacts. Do not infer completion from passing unit/integration tests.
+Remaining goal work includes expanded creator/social/admin workflows, stronger teen-specific controls and safety operations, provider monetization integrations and financial reconciliation, operational/load/security verification, production deployment, ChatGPT integration and promotional artifacts. Existing SDK, starter game and multiplayer functionality are documented under `docs/` and covered by selected local/CI tests, not a complete launch audit. Do not infer production readiness from passing tests.
 
 The earlier local multiplayer prototype is preserved in `archive/prototype-2026-09-20` for reference. It contains known defects and is not the active application.
