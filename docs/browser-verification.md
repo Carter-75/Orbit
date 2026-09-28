@@ -35,6 +35,8 @@ Both scenarios passed together in local Chrome against a fresh database (16.5 se
 
 ## Moderation follow-up
 
+Additional hostile-upload browser evidence is recorded in [sandbox-browser.md](sandbox-browser.md). It exercises real uploaded script content against the iframe boundary and a local HTTP sink, with explicit limitations.
+
 New disposable preview on loopback 3010/3011. Separate DemoPlayer and DemoModerator browser sessions completed: game Report button → populated target → case submission and reference → moderator open-case queue → internal reason plus distinct public reply → resolve → reporter page reload showing resolved status and public reply. Reporter DOM inspection for the internal-only note returned false. Page-error checks showed no errors in the tested sessions. Backend tests independently verify private field exclusion, ownership and concurrent decision conflicts. Creator build review UI and suspension confirmation were implemented but not exercised in this browser flow.
 
 ## Profile, library and analytics — September 24

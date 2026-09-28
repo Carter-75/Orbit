@@ -22,6 +22,9 @@ for (const path of ['index.html', 'game.css', 'game.js', 'orbit.json']) files.pu
 files.push(['orbit-sdk.js', await readFile(new URL('../public/orbit-sdk.js', import.meta.url))]);
 const directory = new URL('../.data/', import.meta.url); await mkdir(directory, { recursive: true });
 const destination = new URL('browser-starter.zip', directory); await writeFile(destination, zip(files));
+const hostile = [];
+for (const path of ['index.html', 'probe.js', 'orbit.json']) hostile.push([path, await readFile(new URL(`../tests/fixtures/hostile-game/${path}`, import.meta.url))]);
+await writeFile(new URL('browser-hostile.zip', directory), zip(hostile));
 process.env.PORT = '3040';
 process.argv.push('--demo-package', resolve('.data/browser-starter.zip'));
 await import('./preview.js');
