@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { createLedger } from './ledger.js';
 
 const reasonSchema = z.object({ reason: z.string().trim().min(10).max(2000) }).strict();
 const reviewSchema = reasonSchema.extend({ decision: z.enum(['approve', 'reject']) });
@@ -13,6 +14,7 @@ function input(schema, body) { const parsed = schema.safeParse(body); if (!parse
 export async function createAdmin({ db, config = {}, auth }) {
   const router = Router(), users = db.collection('users'), projects = db.collection('projects'), versions = db.collection('versions');
   const origin = new URL(config.appOrigin || 'http://localhost:3000').origin;
+  const ledger = await createLedger({ db, mode: config.payments?.mode || 'disabled' });
   await versions.createIndex({ status: 1, submittedAt: 1 });
   router.use(auth.requireUser);
   router.use(run(async (req, res, next) => {
@@ -42,6 +44,12 @@ export async function createAdmin({ db, config = {}, auth }) {
     res.json({ mode: config.payments?.mode || 'disabled', counts: Object.fromEntries(counts.map(row => [row._id, row.count])),
       events: events.map(({ _id, ...value }) => ({ id: _id, ...value })),
       notice: 'Event intake is not payment fulfillment. No balances, payouts or subscription access are granted by receiving an event.' });
+  }));
+  router.get('/payment-ledger', run(async (_req, res) => {
+    const [balances, journals] = await Promise.all([ledger.trialBalance(), db.collection('paymentJournal')
+      .find({ mode: 'test' }, { projection: { _id: 1, currency: 1, entries: 1, source: 1, createdAt: 1, reversalOf: 1, reasonCode: 1 } })
+      .sort({ createdAt: -1 }).limit(50).toArray()]);
+    res.json({ ...balances, configuredMode: config.payments?.mode || 'disabled', journals: journals.map(({ _id, ...entry }) => ({ id: _id, ...entry })) });
   }));
   router.param('id', (_req, _res, next, id) => next(z.string().uuid().safeParse(id).success ? undefined : problem(404, 'Item not found.')));
   router.get('/cases', run(async (_req, res) => {

@@ -11,6 +11,7 @@ An independent creator game platform under active construction. Target audience:
 - Render Blueprint and GitHub checks. These remain deployment preparation, not proof of a live deployment.
 - Authenticated social play, invitations, creator publication and separate-player browser regression checks.
 - Test-only signed Stripe event intake and durable retry foundation; see [payment-event status](docs/payment-events.md). Checkout, paid access and payouts are not yet enabled or implemented.
+- Internal test-only balanced accounting journals with duplicate protection, reversals and admin diagnostics; see [ledger limitations](docs/ledger.md). These are not verified creator earnings or withdrawable balances.
 
 ## Local development
 

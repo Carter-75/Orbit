@@ -7,6 +7,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import { MongoClient } from 'mongodb';
 import { createAdmin } from '../src/admin.js';
 import { createProjects } from '../src/projects.js';
+import { createLedger } from '../src/ledger.js';
 
 let mongo, client, db, app;
 const admin = randomUUID(), owner = randomUUID(), unverified = randomUUID(), target = randomUUID();
@@ -50,6 +51,21 @@ test('payment inbox is admin-only and excludes provider payloads, account mappin
   assert.equal(result.status, 200); assert.equal(result.body.counts.awaiting_handler, 1);
   assert.equal(result.body.events[0].eventId, 'evt_one'); assert.equal(result.text.includes('NEVER-EXPOSE'), false);
   assert.equal(result.text.includes('acct_PRIVATE'), false);
+});
+
+test('test ledger diagnostics require current verified admin and do not offer a posting endpoint', async () => {
+  const ledger = await createLedger({ db, mode: 'test' });
+  const entry = await ledger.post({ source: { provider: 'orbit', scope: 'platform', objectId: 'diagnostic', purpose: 'adjustment' },
+    currency: 'usd', occurredAt: 1700000000, entries: [{ account: 'test:a', amount: 100 }, { account: 'test:b', amount: -100 }] });
+  await db.collection('paymentJournal').updateOne({ _id: entry.id }, { $set: { internalSecret: 'NEVER-EXPOSE' } });
+  assert.equal((await request(app).get('/api/admin/payment-ledger')).status, 401);
+  assert.equal((await request(app).get('/api/admin/payment-ledger').set('X-Test-User', owner)).status, 403);
+  assert.equal((await request(app).get('/api/admin/payment-ledger').set('X-Test-User', unverified)).status, 403);
+  const response = await request(app).get('/api/admin/payment-ledger').set('X-Test-User', admin);
+  assert.equal(response.status, 200); assert.equal(response.body.mode, 'test'); assert.equal(response.body.configuredMode, 'disabled');
+  assert.equal(response.body.currencies[0].balanced, true); assert.equal(response.body.accounts[0].amount, '100');
+  assert.equal(response.text.includes('NEVER-EXPOSE'), false); assert.equal(response.headers['cache-control'], 'no-store');
+  assert.equal((await post('/payment-ledger', { amount: 99999 })).status, 404);
 });
 test('queue projects minimal metadata, review is conditional and audit is atomic', async () => {
   const { versionId } = await pending();
