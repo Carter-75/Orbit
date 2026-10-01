@@ -24,11 +24,13 @@ await Orbit.multiplayer.leave();
 unsubscribe();
 ```
 
-Join resolves when the request is sent, not when membership succeeds; inspect room/error events. Rooms are ephemeral, single-server, capped at eight players (or a lower manifest limit). Players need verified accounts, matching age bands, and no block relationship. Restart ends rooms. Reconnect explicitly with a room ID if the room still exists. Public matchmaking and friend invitation UI are separate unfinished work.
+Join resolves when the request is sent, not when membership succeeds; inspect room/error events. Rooms are ephemeral, single-server, capped at eight players (or a lower manifest limit). Players need verified accounts, matching age bands, and no block relationship. Restart ends rooms. Reconnect explicitly with a room ID if the room still exists. Friend invitation UI is implemented (see invitations.md); public matchmaking remains unfinished.
 
 State payloads are at most 2 KB and are untrusted. Validate every incoming field before use; do not render state as HTML. This transport does not provide authoritative physics, anti-cheat, currency, purchases, or safe free-text communication. Do not implement chat through arbitrary state; game moderation must review communication surfaces. Curated phrases: Hello!, Great game!, Follow me!, Ready?, Thanks!, Goodbye!.
 
 Saves are JSON up to 8 KB per player/game, shared across published versions. Preview saves are separate per build. Do not use client-controlled saves as authoritative balances or entitlements. Save at checkpoints, not each animation frame. API rate limits apply.
+
+Publishing or restoring another approved build changes new launches. Existing grants remain pinned to their original approved build until access expires or is revoked; rollback alone does not terminate a running game. New-version rooms and old-version rooms are distinct. Keep saved-data formats backward compatible across versions because a restored build reads the same player/game save. A rollback is not a security revocation: use moderator project suspension when all builds must stop serving. Already-delivered bytes cannot be recalled. Asset requests and SDK calls continue to recheck session and moderation eligibility.
 
 The trusted host checks frame identity, transfers a private MessagePort, gates declared capabilities, and owns authenticated network requests. Games receive public player identity only, never cookies, account email, date of birth, launch grants, or database credentials. Ads and subscriptions are not yet available; manifest declaration alone does not activate them.
 

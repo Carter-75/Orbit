@@ -226,14 +226,24 @@ async function loadProject(id) {
         await loadProject(id); announce('Build validated. Preview it before submitting for review.');
       } catch (error) { announce(error.message); } finally { submit.disabled = false; }
     };
+    const publishedBuild = versions.find(version => version.id === project.publishedVersion);
+    if (publishedBuild) area.append(element('p', 'Publishing another approved build changes new launches. Players already in a game stay on their approved build until they relaunch or their session expires.'));
     for (const version of versions) {
-      const row = element('div', '', 'version'); row.append(element('span', `${new Date(version.createdAt).toLocaleString()} · ${version.status} · ${Math.ceil(version.totalBytes / 1024)} KB`));
+      const row = element('div', '', 'version'); row.dataset.versionId = version.id;
+      row.append(element('span', `Build ${version.id.slice(0, 8)} · ${new Date(version.createdAt).toLocaleString()} · ${version.status} · ${Math.ceil(version.totalBytes / 1024)} KB`));
       if (version.reviewReason) row.append(element('p', `Review feedback: ${version.reviewReason}`));
       if (version.reviewedAt) row.append(element('small', `Reviewed ${new Date(version.reviewedAt).toLocaleString()}`));
       const action = (label, handler) => { const button = element('button', label); button.onclick = async () => { button.disabled = true; try { await handler(); } catch (error) { announce(error.message); } finally { button.disabled = false; } }; row.append(button); };
       if (version.status !== 'staging') action('Preview', () => launchGame(id, version.id, project.title));
       if (['ready', 'rejected'].includes(version.status)) action('Submit for review', async () => { await api(`/projects/${id}/versions/${version.id}/submit`, {}); await loadProject(id); announce('Submitted for review.'); });
-      if (version.status === 'approved' && project.publishedVersion !== version.id) action('Publish this version', async () => { await api(`/projects/${id}/publish`, { versionId: version.id }); await loadProject(id); await loadProjects(); games = (await api('/games')).games; renderGames(); announce('Published.'); });
+      if (version.status === 'approved' && project.publishedVersion !== version.id) {
+        const restore = publishedBuild && new Date(version.createdAt) < new Date(publishedBuild.createdAt);
+        action(restore ? 'Restore this version' : 'Publish this version', async () => {
+          await api(`/projects/${id}/${restore ? 'rollback' : 'publish'}`, { versionId: version.id });
+          await loadProject(id); await loadProjects(); games = (await api('/games')).games; renderGames();
+          announce(restore ? 'Earlier approved build restored for new launches.' : 'Published.');
+        });
+      }
       if (project.publishedVersion === version.id) row.append(element('small', 'Currently published'));
       area.append(row);
     }

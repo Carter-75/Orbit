@@ -69,6 +69,48 @@ test('creator uploads a build, moderator reviews it and another player launches 
     await player.locator('#play-area').screenshot({ path: testInfo.outputPath('published-game.png') });
     await detail.getByRole('button', { name: 'View launch activity' }).click();
     await expect(detail).toContainText('1 public launch authorizations');
+
+    // Upload different bytes and approve through the moderator UI, not a test-only bypass.
+    const originalId = await detail.locator('.version').getAttribute('data-version-id');
+    await creator.getByLabel('Game package (.zip)', { exact: true }).setInputFiles(resolve('.data/browser-revision.zip'));
+    await creator.getByRole('button', { name: 'Upload build', exact: true }).click();
+    await expect(detail.locator('.version')).toHaveCount(2);
+    const revision = detail.locator('.version').filter({ hasText: 'ready' });
+    await revision.getByRole('button', { name: 'Submit for review', exact: true }).click();
+    await moderator.getByRole('button', { name: 'Refresh moderation queue' }).click();
+    await review.getByRole('button', { name: 'Preview build' }).click();
+    await expect(moderator.frameLocator('#game-frame').getByRole('heading', { name: 'Star Garden — revision two', exact: true })).toBeVisible();
+    await moderator.getByRole('button', { name: 'Close game', exact: true }).click();
+    await review.getByLabel('Review reason (creator can see this)').fill('Reviewed the distinct second build.');
+    await review.getByRole('button', { name: 'Approve build' }).click();
+    await expect(review).toHaveCount(0);
+    await creator.reload();
+    await creator.locator('#project-list article').filter({ has: creator.getByRole('heading', { name: title, exact: true }) }).getByRole('button', { name: 'Manage builds' }).click();
+    await detail.getByRole('button', { name: 'Publish this version', exact: true }).click();
+    const original = detail.locator(`.version[data-version-id="${originalId}"]`);
+    await expect(original.getByRole('button', { name: 'Restore this version', exact: true })).toBeVisible();
+    await expect(player.frameLocator('#game-frame').getByRole('heading', { name: 'Star Garden', exact: true })).toBeVisible();
+    await player.getByRole('button', { name: 'Close game', exact: true }).click();
+    await listing.getByRole('button', { name: 'Play', exact: true }).click();
+    await expect(player.frameLocator('#game-frame').getByRole('heading', { name: 'Star Garden — revision two', exact: true })).toBeVisible();
+    const secondURL = await player.locator('#game-frame').getAttribute('src');
+
+    const rollback = creator.waitForResponse(response => response.url().endsWith('/rollback') && response.request().method() === 'POST');
+    await original.getByRole('button', { name: 'Restore this version', exact: true }).click();
+    expect((await rollback).status()).toBe(200);
+    await expect(original).toContainText('Currently published');
+    await expect(original.getByRole('button', { name: 'Restore this version', exact: true })).toHaveCount(0);
+    await expect(player.frameLocator('#game-frame').getByRole('heading', { name: 'Star Garden — revision two', exact: true })).toBeVisible();
+    expect((await player.request.get(secondURL)).status()).toBe(200);
+    await player.frameLocator('#game-frame').getByRole('button', { name: 'Save progress', exact: true }).click();
+    await expect(player.frameLocator('#game-frame').locator('#status')).toContainText('Progress saved to your Orbit account.');
+    await player.getByRole('button', { name: 'Close game', exact: true }).click();
+    await listing.getByRole('button', { name: 'Play', exact: true }).click();
+    await expect(player.frameLocator('#game-frame').getByRole('heading', { name: 'Star Garden', exact: true })).toBeVisible();
+    await expect(player.frameLocator('#game-frame').locator('#status')).toContainText('Welcome, DemoPlayer');
+    await detail.getByRole('button', { name: 'View launch activity' }).click();
+    await expect(detail).toContainText('3 public launch authorizations');
+    await detail.screenshot({ path: testInfo.outputPath('restored-build.png') });
     expect(errors).toEqual([]);
   } finally { await Promise.all(contexts.map(context => context.close())); }
 });

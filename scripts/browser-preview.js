@@ -22,6 +22,11 @@ for (const path of ['index.html', 'game.css', 'game.js', 'orbit.json']) files.pu
 files.push(['orbit-sdk.js', await readFile(new URL('../public/orbit-sdk.js', import.meta.url))]);
 const directory = new URL('../.data/', import.meta.url); await mkdir(directory, { recursive: true });
 const destination = new URL('browser-starter.zip', directory); await writeFile(destination, zip(files));
+// A visibly different, independently uploaded revision makes rollback assertions
+// prove which bytes are delivered, not just a changed platform label.
+const revision = files.map(([path, bytes]) => [path, path === 'index.html'
+  ? Buffer.from(bytes.toString().replace('<h1>Star Garden</h1>', '<h1>Star Garden — revision two</h1>')) : bytes]);
+await writeFile(new URL('browser-revision.zip', directory), zip(revision));
 const hostile = [];
 for (const path of ['index.html', 'probe.js', 'orbit.json']) hostile.push([path, await readFile(new URL(`../tests/fixtures/hostile-game/${path}`, import.meta.url))]);
 await writeFile(new URL('browser-hostile.zip', directory), zip(hostile));
