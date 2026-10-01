@@ -76,6 +76,25 @@ test('stages complete builds, requires real approval, publishes and rolls back a
   assert.equal((await post(`/${id}/rollback`, { versionId: b })).status, 403);
   assert.equal((await upload(id)).status, 403);
 });
+test('creator sees review feedback but not moderator identity or internal audit history, including resubmission', async () => {
+  const created = await post('/', { title: 'Review privacy' }), id = created.body.project.id;
+  const uploaded = await upload(id), versionId = uploaded.body.version.id;
+  const reason = 'Please make the controls readable.';
+  await db.collection('versions').updateOne({ _id: versionId }, { $set: {
+    status: 'rejected', reviewReason: reason, reviewedAt: new Date(), reviewedBy: 'private-moderator',
+    moderationHistory: [{ actorId: 'private-moderator', internal: 'private audit detail' }], futureInternalField: 'private',
+  } });
+  const detail = await get(`/${id}`), version = detail.body.versions[0];
+  assert.equal(version.reviewReason, reason); assert.ok(version.reviewedAt);
+  for (const field of ['reviewedBy', 'moderationHistory', 'futureInternalField', 'ownerId']) assert.equal(field in version, false);
+  assert.equal((await get(`/${id}`, 'outsider')).status, 404);
+  const submitted = await post(`/${id}/versions/${versionId}/submit`);
+  assert.equal(submitted.status, 200); assert.equal(submitted.body.version.status, 'pending');
+  for (const field of ['reviewReason', 'reviewedBy', 'moderationHistory', 'futureInternalField', 'ownerId']) assert.equal(field in submitted.body.version, false);
+  const stored = await db.collection('versions').findOne({ _id: versionId });
+  assert.equal(stored.moderationHistory[0].actorId, 'private-moderator');
+});
+
 test('atomic quotas withstand concurrent project creation and bound version storage', async () => {
   const results = await Promise.all([post('/', { title: 'Last A' }, 'limited'), post('/', { title: 'Last B' }, 'limited')]);
   assert.deepEqual(results.map(result => result.status).sort(), [201, 409]);

@@ -228,6 +228,8 @@ async function loadProject(id) {
     };
     for (const version of versions) {
       const row = element('div', '', 'version'); row.append(element('span', `${new Date(version.createdAt).toLocaleString()} · ${version.status} · ${Math.ceil(version.totalBytes / 1024)} KB`));
+      if (version.reviewReason) row.append(element('p', `Review feedback: ${version.reviewReason}`));
+      if (version.reviewedAt) row.append(element('small', `Reviewed ${new Date(version.reviewedAt).toLocaleString()}`));
       const action = (label, handler) => { const button = element('button', label); button.onclick = async () => { button.disabled = true; try { await handler(); } catch (error) { announce(error.message); } finally { button.disabled = false; } }; row.append(button); };
       if (version.status !== 'staging') action('Preview', () => launchGame(id, version.id, project.title));
       if (['ready', 'rejected'].includes(version.status)) action('Submit for review', async () => { await api(`/projects/${id}/versions/${version.id}/submit`, {}); await loadProject(id); announce('Submitted for review.'); });

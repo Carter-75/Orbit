@@ -15,6 +15,9 @@ const failure = (status, message) => Object.assign(new Error(message), { status 
 const ownerFilter = req => ({ _id: req.params.id, ownerId: req.user._id });
 const writableFilter = req => ({ ...ownerFilter(req), suspended: { $ne: true }, status: { $ne: 'suspended' } });
 const view = document => { const { _id, ...data } = document; return { id: _id, ...data }; };
+// Creator-facing fields only; reviewer identities and moderation audit history stay internal.
+const versionProjection = { _id: 1, projectId: 1, status: 1, manifest: 1, fileCount: 1,
+  totalBytes: 1, createdAt: 1, completedAt: 1, submittedAt: 1, reviewReason: 1, reviewedAt: 1 };
 
 /** Mount after auth.authenticate; the router also enforces its own mutation origin check. */
 export async function createProjects({ db, config = {}, auth }) {
@@ -57,7 +60,7 @@ export async function createProjects({ db, config = {}, auth }) {
     req.project = project; next();
   }));
   router.get('/:id', run(async (req, res) => {
-    const builds = await versions.find({ projectId: req.project._id, ownerId: req.user._id }).sort({ createdAt: -1 }).limit(VERSION_LIMIT).toArray();
+    const builds = await versions.find({ projectId: req.project._id, ownerId: req.user._id }, { projection: versionProjection }).sort({ createdAt: -1 }).limit(VERSION_LIMIT).toArray();
     res.json({ project: view(req.project), versions: builds.map(view) });
   }));
   router.get('/:id/analytics', run(async (req, res) => {
@@ -99,7 +102,7 @@ export async function createProjects({ db, config = {}, auth }) {
     if (!z.string().uuid().safeParse(req.params.versionId).success) throw failure(404, 'Version not found.');
     const eligible = await projects.findOne(writableFilter(req));
     if (!eligible) throw failure(403, 'Project is not writable.');
-    const version = await versions.findOneAndUpdate({ _id: req.params.versionId, projectId: req.params.id, ownerId: req.user._id, status: { $in: ['ready', 'rejected'] } }, { $set: { status: 'pending', submittedAt: new Date() }, $unset: { reviewReason: '', reviewedAt: '', reviewedBy: '' } }, { returnDocument: 'after' });
+    const version = await versions.findOneAndUpdate({ _id: req.params.versionId, projectId: req.params.id, ownerId: req.user._id, status: { $in: ['ready', 'rejected'] } }, { $set: { status: 'pending', submittedAt: new Date() }, $unset: { reviewReason: '', reviewedAt: '', reviewedBy: '' } }, { returnDocument: 'after', projection: versionProjection });
     if (!version) throw failure(409, 'Only completed, unapproved versions can be submitted.');
     await projects.updateOne({ ...writableFilter(req), publishedVersion: null }, { $set: { status: 'review', updatedAt: new Date() } });
     res.json({ version: view(version) });
