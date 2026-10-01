@@ -1,5 +1,6 @@
 import express from 'express';
 import { createHash } from 'node:crypto';
+import { grantSessionActive } from './grant-session.js';
 
 export function createAssetApp({ db, config }) {
   const app = express();
@@ -22,6 +23,7 @@ export function createAssetApp({ db, config }) {
       _id: createHash('sha256').update(ticket).digest('hex'), expiresAt: { $gt: new Date() },
     });
     if (!grant) return res.sendStatus(404);
+    if (!await grantSessionActive(db, grant)) return res.sendStatus(404);
     const project = await db.collection('projects').findOne({ _id: grant.projectId, status: { $ne: 'suspended' } });
     if (!project) return res.sendStatus(404);
     const user = await db.collection('users').findOne({ _id: grant.userId, authVersion: grant.authVersion, suspended: { $ne: true } });

@@ -39,6 +39,11 @@ test('an actually uploaded hostile game cannot access platform state or escape i
     expect(page.url()).toBe('http://127.0.0.1:3040/');
     expect(errors).toEqual([]);
     await page.locator('#play-area').screenshot({ path: testInfo.outputPath('sandbox-probes.png') });
+    const assetURL = await page.locator('#game-frame').getAttribute('src');
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page.locator('#account-button')).toHaveText('Sign in');
+    await expect(page.locator('#play-area')).toBeHidden();
+    expect((await page.request.get(assetURL)).status()).toBe(404);
   } finally {
     await context.close(); sink.closeAllConnections(); await new Promise(resolve => sink.close(resolve));
   }

@@ -12,10 +12,12 @@ test('game invitations recheck live rooms, friendship, ownership, expiry, blocks
   try {
     const db = client.db('invites'); const sender = randomUUID(), recipient = randomUUID(), stranger = randomUUID(), roomId = randomUUID(), projectId = randomUUID(), versionId = randomUUID();
     const grantId = randomBytes(32).toString('hex'); const origin = 'http://localhost:3000'; let sessionActive = true;
+    const sessionId = randomBytes(32).toString('hex');
+    await db.collection('sessions').insertOne({ _id: sessionId, userId: sender, authVersion: 0, expiresAt: new Date(Date.now() + 60000) });
     await db.collection('users').insertMany([sender, recipient, stranger].map(_id => ({ _id, username: _id === sender ? 'Sender' : 'Player', emailVerified: true, ageBand: 'teen', authVersion: 0 })));
     await db.collection('projects').insertOne({ _id: projectId, ownerId: stranger, title: 'Game', status: 'published', publishedVersion: versionId });
     await db.collection('versions').insertOne({ _id: versionId, projectId, status: 'approved', manifest: { capabilities: ['multiplayer'] } });
-    await db.collection('launchGrants').insertOne({ _id: grantId, projectId, versionId, userId: sender, authVersion: 0, preview: false, expiresAt: new Date(Date.now() + 60000) });
+    await db.collection('launchGrants').insertOne({ _id: grantId, projectId, versionId, userId: sender, authVersion: 0, sessionId, preview: false, expiresAt: new Date(Date.now() + 60000) });
     const room = { id: roomId, projectId, versionId, preview: false, capacity: 2, members: new Map([[sender, { cookie: sender, grantId, ws: { readyState: 1 } }]]) };
     const rooms = new Map([[roomId, room]]);
     const app = express(); app.use(express.json()); app.use((req, _res, next) => { req.user = req.get('test-user') ? { _id: req.get('test-user') } : null; next(); });

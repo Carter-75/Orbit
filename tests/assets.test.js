@@ -13,12 +13,14 @@ test('private game grant enforces ownership, expiry and suspension; assets canno
     const db = client.db('asset-test');
     const config = { appOrigin: 'http://localhost:3000', assetOrigin: 'http://localhost:3001' };
     const owner = { _id: 'creator', authVersion: 0 };
+    const sessionId = 'c'.repeat(64);
+    await db.collection('sessions').insertOne({ _id: sessionId, userId: owner._id, authVersion: 0, expiresAt: new Date(Date.now() + 60000) });
     await db.collection('users').insertOne(owner);
     await db.collection('projects').insertOne({ _id: 'project', ownerId: owner._id, status: 'draft' });
     await db.collection('versions').insertOne({ _id: 'build', projectId: 'project', status: 'ready', manifest: { entry: 'index.html' } });
     await db.collection('assets').insertOne({ versionId: 'build', path: 'index.html', content: new Binary(Buffer.from('<h1>A creator game</h1>')), mime: 'text/html' });
     const app = express(); app.use(express.json());
-    app.use((req, _res, next) => { req.user = req.get('Test-User') === 'intruder' ? { _id: 'intruder', authVersion: 0 } : owner; next(); });
+    app.use((req, _res, next) => { req.authSessionId = sessionId; req.user = req.get('Test-User') === 'intruder' ? { _id: 'intruder', authVersion: 0 } : owner; next(); });
     app.use(await createLaunch({ db, config, auth: { requireUser: (_req, _res, next) => next() } }));
     const denied = await request(app).post('/project/launch').set('Test-User', 'intruder').send({ preview: true, versionId: 'build' });
     assert.equal(denied.status, 403);

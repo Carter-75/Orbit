@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import express from 'express';
 import request from 'supertest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
@@ -54,7 +54,9 @@ test('analytics count issued public grants, exclude staff/previews, expose no id
     assert.equal(JSON.stringify(stored).includes(outsider), false); assert.equal(stored.expiresAt.toISOString(), '2026-12-23T00:00:00.000Z');
     await db.collection('projects').insertOne({ _id: projectId, ownerId, status: 'published', publishedVersion: versionId });
     await db.collection('versions').insertOne({ _id: versionId, projectId, status: 'approved', manifest: { entry: 'index.html' } });
-    const app = express(); app.use(express.json()); app.use((req, _res, next) => { req.user = { _id: req.get('test-user'), authVersion: 0 }; next(); });
+    const sessionFor = id => createHash('sha256').update(id).digest('hex');
+    await db.collection('sessions').insertMany([ownerId, outsider].map(userId => ({ _id: sessionFor(userId), userId, authVersion: 0, expiresAt: new Date(Date.now() + 60000) })));
+    const app = express(); app.use(express.json()); app.use((req, _res, next) => { req.user = { _id: req.get('test-user'), authVersion: 0 }; req.authSessionId = sessionFor(req.user._id); next(); });
     const auth = { requireUser: (_req, _res, next) => next() }, config = { appOrigin: 'http://localhost:3000', assetOrigin: 'http://localhost:3001' };
     app.use('/projects', await createProjects({ db, config, auth })); app.use('/games', await createLaunch({ db, config, auth }));
     assert.equal((await request(app).get(`/projects/${projectId}/analytics`).set('test-user', outsider)).status, 404);

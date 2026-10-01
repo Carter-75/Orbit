@@ -11,10 +11,12 @@ test('SDK saves are player-scoped, capability-gated, bounded and preview-isolate
   try {
     const db = client.db('saves'); const grantId = 'a'.repeat(64), previewId = 'b'.repeat(64);
     const user = { _id: 'alice', authVersion: 0 };
+    const sessionId = 'c'.repeat(64);
+    await db.collection('sessions').insertOne({ _id: sessionId, userId: 'alice', authVersion: 0, expiresAt: new Date(Date.now() + 60000) });
     await db.collection('projects').insertOne({ _id: 'game', ownerId: 'alice', status: 'published' });
     await db.collection('versions').insertOne({ _id: 'v1', projectId: 'game', status: 'approved', manifest: { capabilities: ['storage'] } });
     for (const [id, preview] of [[grantId, false], [previewId, true]]) await db.collection('launchGrants').insertOne({
-      _id: id, userId: 'alice', authVersion: 0, projectId: 'game', versionId: 'v1', preview, expiresAt: new Date(Date.now() + 60000),
+      _id: id, userId: 'alice', authVersion: 0, sessionId, projectId: 'game', versionId: 'v1', preview, expiresAt: new Date(Date.now() + 60000),
     });
     const app = express(); app.use(express.json());
     app.use((req, _res, next) => { req.user = { ...user, _id: req.get('test-user') || 'alice' }; next(); });

@@ -15,10 +15,14 @@ export async function createLaunch({ db, config, auth }) {
     if (typeof versionId !== 'string') return res.status(400).json({ error: 'Choose a game version.' });
     const version = await db.collection('versions').findOne({ _id: versionId, projectId: project._id, status: { $ne: 'staging' } });
     if (!version || (!preview && version.status !== 'approved')) return res.status(404).json({ error: 'Build unavailable.' });
+    const session = typeof req.authSessionId === 'string' && await db.collection('sessions').findOne({
+      _id: req.authSessionId, userId: req.user._id, authVersion: req.user.authVersion, expiresAt: { $gt: new Date() },
+    });
+    if (!session) return res.status(401).json({ error: 'Your session ended. Sign in again.' });
     const ticket = randomBytes(32).toString('base64url');
-    const expiresAt = new Date(Date.now() + 30 * 60000);
+    const expiresAt = new Date(Math.min(Date.now() + 30 * 60000, session.expiresAt.getTime()));
     await db.collection('launchGrants').insertOne({ _id: createHash('sha256').update(ticket).digest('hex'),
-      projectId: project._id, versionId, userId: req.user._id, authVersion: req.user.authVersion, preview, expiresAt });
+      projectId: project._id, versionId, userId: req.user._id, authVersion: req.user.authVersion, sessionId: session._id, preview, expiresAt });
     await recordLaunch(db, { projectId: project._id, ownerId: project.ownerId, user: req.user, preview });
     res.json({ grantId: createHash('sha256').update(ticket).digest('hex'), url: `${config.assetOrigin}/play/${ticket}/${version.manifest.entry}`, expiresAt, manifest: version.manifest });
   });

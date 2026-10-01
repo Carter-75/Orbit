@@ -117,7 +117,7 @@ export async function createAuth({ db, config = {}, sendMail }) {
     const part = header.split(';').map((s) => s.trim()).find((s) => s.startsWith(`${cookieName}=`));
     return part?.slice(cookieName.length + 1) || null;
   }
-  async function resolveSession(header) {
+  async function resolveSessionContext(header) {
     const value = cookieValue(header);
     if (!value || !/^[\w-]{43}$/.test(value)) return null;
     const session = await sessions.findOne({ _id: digest(value), expiresAt: { $gt: new Date() } });
@@ -127,9 +127,13 @@ export async function createAuth({ db, config = {}, sendMail }) {
       await users.updateOne({ _id: user._id }, { $set: { ageBand: 'adult' }, $unset: { adultAt: '' } });
       user.ageBand = 'adult'; delete user.adultAt;
     }
-    return user;
+    return user ? { user, sessionId: session._id } : null;
   }
-  const authenticate = asyncRoute(async (req, _res, next) => { req.user = await resolveSession(req.headers.cookie); next(); });
+  const resolveSession = async header => (await resolveSessionContext(header))?.user || null;
+  const authenticate = asyncRoute(async (req, _res, next) => {
+    const context = await resolveSessionContext(req.headers.cookie);
+    req.user = context?.user || null; req.authSessionId = context?.sessionId || null; next();
+  });
   const requireUser = (req, res, next) => req.user ? next() : res.status(401).json({ error: 'Sign in to continue.' });
   async function clearSession(req, res) {
     const value = cookieValue(req.headers.cookie);

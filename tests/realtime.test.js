@@ -17,7 +17,9 @@ test('authenticated rooms synchronize two users, enforce limits/age/blocks and c
   async function player(id, ageBand = 'teen') {
     users.set(id, { _id: id, username: id, ageBand, authVersion: 0, emailVerified: true });
     const grantId = randomBytes(32).toString('hex');
-    await db.collection('launchGrants').insertOne({ _id: grantId, userId: id, authVersion: 0, projectId: 'game', versionId: 'v1', expiresAt: new Date(Date.now() + 60000) });
+    const sessionId = randomBytes(32).toString('hex');
+    await db.collection('sessions').insertOne({ _id: sessionId, userId: id, authVersion: 0, expiresAt: new Date(Date.now() + 60000) });
+    await db.collection('launchGrants').insertOne({ _id: grantId, userId: id, authVersion: 0, sessionId, projectId: 'game', versionId: 'v1', expiresAt: new Date(Date.now() + 60000) });
     return grantId;
   }
   async function connect(id) {
