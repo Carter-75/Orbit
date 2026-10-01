@@ -20,7 +20,7 @@ Concurrent requests cannot append duplicate grants. An already-admin result does
 
 ## Remaining release gates
 
-Production has not been provisioned. `PUBLIC_LAUNCH=false` currently blocks all production registration, so a controlled first-owner/private-beta enrollment path is still needed; **do not temporarily open public registration, seed a demo account, or manually mark email verified to work around this**. This command covers privilege assignment after legitimate registration/verification, not the complete first-user setup.
+Production has not been provisioned. Use [private enrollment](private-enrollment.md) to register the intended owner while `PUBLIC_LAUNCH=false`; **do not temporarily open public registration, seed a demo account, or manually mark email verified**. This command covers privilege assignment after legitimate registration/verification, not email-provider setup or deployed validation.
 
 Administrator MFA, secure demotion/recovery, access recertification, operator-identity attribution and production account verification remain launch work. The command is not proof that production admin access is ready. It adds no new environment settings to Render and is never run automatically on deployment.
 

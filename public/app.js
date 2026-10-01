@@ -62,6 +62,13 @@ function displayAccount() {
   $('#studio-notice').textContent = user && !user.emailVerified ? 'Verify your email before creating or uploading games.' : '';
   if (user) void loadProjects();
 }
+const enrollmentLabel = element('label', 'Invitation code (if invited)');
+const enrollmentInput = document.createElement('input');
+enrollmentInput.name = 'invitationCode'; enrollmentInput.type = 'password';
+enrollmentInput.autocomplete = 'off'; enrollmentInput.maxLength = 43;
+enrollmentLabel.append(enrollmentInput, element('small', 'Private signup requires the code issued for your email. It does not replace email verification.'));
+enrollmentLabel.hidden = true;
+$('#auth-form').insertBefore(enrollmentLabel, $('#auth-error'));
 function setMode(value) {
   mode = value;
   const register = mode === 'register';
@@ -69,6 +76,8 @@ function setMode(value) {
   $('#auth-description').textContent = register ? 'Create your free account. Your password needs at least 15 characters.' : 'Sign in to your Orbit account.';
   $('#username-field').hidden = !register;
   $('#dob-field').hidden = !register;
+  enrollmentLabel.hidden = !register;
+  if (!register) enrollmentInput.value = '';
   $('#auth-form').elements.username.required = register;
   $('#auth-form').elements.dateOfBirth.required = register;
   $('#auth-form').elements.password.autocomplete = register ? 'new-password' : 'current-password';
@@ -88,7 +97,7 @@ $('#auth-form').onsubmit = async (event) => {
   $('#auth-submit').disabled = true;
   $('#auth-error').textContent = '';
   try {
-    const body = mode === 'register' ? { username: fields.username, email: fields.identifier, password: fields.password, dateOfBirth: fields.dateOfBirth } : { identifier: fields.identifier, password: fields.password };
+    const body = mode === 'register' ? { username: fields.username, email: fields.identifier, password: fields.password, dateOfBirth: fields.dateOfBirth, invitationCode: fields.invitationCode?.trim() } : { identifier: fields.identifier, password: fields.password };
     const result = await api(`/auth/${mode}`, body);
     user = result.user;
     if (!user) user = (await api('/auth/me')).user;

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+import { enrollmentAvailable, consumeEnrollment } from './enrollment.js';
 
 const scrypt = promisify(scryptCallback);
 const COST = { N: 131072, r: 8, p: 1, maxmem: 160 * 1024 * 1024 };
@@ -101,6 +102,7 @@ export async function createAuth({ db, config = {}, sendMail }) {
     sessions.createIndex({ userId: 1 }),
     links.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     outbox.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    db.collection('enrollments').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     outbox.createIndex({ status: 1, nextAttemptAt: 1, leaseUntil: 1 }),
   ]);
   const router = Router();
@@ -167,10 +169,16 @@ export async function createAuth({ db, config = {}, sendMail }) {
   const credentialsLimit = limit(20);
   const recoveryLimit = limit(5);
   router.post('/register', credentialsLimit, asyncRoute(async (req, res) => {
-    const { username, email, password, dateOfBirth } = req.body || {};
+    const { username, email, password, dateOfBirth, invitationCode } = req.body || {};
+    const privateEnrollment = config.production && !config.publicLaunch;
+    const closed = () => res.status(503).json({ error: 'Public signup is closed. A valid invitation for this email is required.' });
+    if (privateEnrollment && (!emailOK(email) || !await enrollmentAvailable(db, email, invitationCode))) return closed();
     const age = ageDetails(dateOfBirth);
     if (typeof username !== 'string' || !/^[A-Za-z][A-Za-z0-9_]{2,23}$/.test(username) || !emailOK(email) || !passwordOK(password) || !age) return res.status(400).json({ error: 'Use a valid email, a 3–24 character username, a 15–128 character password, and a valid date of birth. Orbit is for ages 13 and older.' });
     const user = { _id: randomUUID(), username, usernameKey: username.toLowerCase(), email: email.trim().toLowerCase(), emailKey: email.trim().toLowerCase(), passwordHash: await hashPassword(password), authVersion: 0, emailVerified: false, role: 'player', ...age, createdAt: new Date() };
+    // Consume after validation/hashing, immediately before insertion. A crash or
+    // ambiguous insert failure burns this code; operators can reissue, never replay.
+    if (privateEnrollment && !await consumeEnrollment(db, email, invitationCode, user._id)) return closed();
     try { await users.insertOne(user); } catch (error) { if (error.code === 11000) return res.status(409).json({ error: 'Unable to create this account. Try signing in or choose another username.' }); throw error; }
     await startSession(req, res, user);
     await emailLink(user.emailKey, 'verify');

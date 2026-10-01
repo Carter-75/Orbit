@@ -50,10 +50,6 @@ export async function createApp({ db, config, sendMail }) {
   app.use(express.json({ limit: '32kb' }));
   app.use(cookieParser());
   const auth = await createAuth({ db, config, sendMail });
-  app.post('/api/auth/register', (_req, res, next) => {
-    if (config.production && !config.publicLaunch) return res.status(503).json({ error: 'Orbit is not open for new accounts yet.' });
-    next();
-  });
   app.use('/api/auth', auth.router);
   app.use('/api', auth.authenticate);
   app.use('/api', rateLimit({ windowMs: 60000, limit: 120, identifier: 'account-or-guest',
