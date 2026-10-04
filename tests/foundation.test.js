@@ -29,7 +29,7 @@ test('full app hides source, uses real database health and rejects cross-origin 
     for (const path of ['/src/auth.js', '/package.json', '/.env', '/archive/prototype-2026-09-20/server.mjs']) {
       assert.equal((await request(app).get(path)).status, 404, path);
     }
-    assert.deepEqual((await request(app).get('/api/games')).body, { games: [] });
+    assert.deepEqual((await request(app).get('/api/games')).body, { games: [], nextCursor: null });
     assert.equal((await request(app).post('/api/auth/logout').send({})).status, 403);
     const registration = await request(app).post('/api/auth/register').set('Origin', config.appOrigin).send({
       username: 'FreshCreator', email: 'fresh@example.test', password: 'my strong fresh passphrase', dateOfBirth: '2000-01-01',

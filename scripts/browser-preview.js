@@ -32,4 +32,5 @@ for (const path of ['index.html', 'probe.js', 'orbit.json']) hostile.push([path,
 await writeFile(new URL('browser-hostile.zip', directory), zip(hostile));
 process.env.PORT = '3040';
 process.argv.push('--demo-package', resolve('.data/browser-starter.zip'));
+process.argv.push('--catalog-fixtures');
 await import('./preview.js');

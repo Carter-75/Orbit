@@ -14,6 +14,7 @@ import { createSafety } from './safety.js';
 import { createLibrary } from './library.js';
 import { createInvitations } from './invitations.js';
 import { createStripeEvents } from './stripe-events.js';
+import { createDiscovery } from './discovery.js';
 
 export async function createApp({ db, config, sendMail }) {
   const app = express();
@@ -67,12 +68,7 @@ export async function createApp({ db, config, sendMail }) {
     name: 'Orbit', minimumAge: 13, publicLaunch: config.publicLaunch,
     capabilities: { email: Boolean(config.emailApiKey && config.emailFrom), ads: false, subscriptions: false },
   }));
-  app.get('/api/games', async (_req, res) => {
-    const games = await db.collection('projects').find({ status: 'published' }, {
-      projection: { title: 1, description: 1, genre: 1, ownerName: 1, publishedVersion: 1 },
-    }).sort({ publishedAt: -1 }).limit(60).toArray();
-    res.json({ games });
-  });
+  app.use('/api/games', await createDiscovery({ db }));
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Unknown API route.' }));
   app.use(express.static(fileURLToPath(new URL('../public/', import.meta.url)), {
     dotfiles: 'deny', index: 'index.html', redirect: false,

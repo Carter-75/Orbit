@@ -8,6 +8,27 @@ const $ = (selector) => document.querySelector(selector);
 let mode = 'login';
 let user = null;
 let games = [];
+let discoveryCursor = null, discoveryLoading = false, discoveryError = '', discoveryGeneration = 0, searchTimer;
+const moreGames = element('button', 'Load more games'); moreGames.hidden = true;
+const discoveryStatus = element('p'); discoveryStatus.setAttribute('role', 'status');
+$('#games').after(discoveryStatus, moreGames);
+$('#search').maxLength = 80;
+moreGames.onclick = () => { if (!discoveryLoading) void loadDiscovery(Boolean(discoveryCursor)); };
+async function loadDiscovery(append = false) {
+  const generation = ++discoveryGeneration, query = $('#search').value.trim();
+  if (!append) { games = []; discoveryCursor = null; }
+  discoveryLoading = true; discoveryError = ''; renderGames();
+  const params = new URLSearchParams({ q: query });
+  if (append && discoveryCursor) params.set('cursor', discoveryCursor);
+  try {
+    const result = await api(`/games?${params}`);
+    if (generation !== discoveryGeneration) return;
+    const merged = append ? [...games, ...result.games] : result.games;
+    games = [...new Map(merged.map(game => [game._id, game])).values()];
+    discoveryCursor = result.nextCursor;
+  } catch (error) { if (generation === discoveryGeneration) discoveryError = error.message; }
+  finally { if (generation === discoveryGeneration) { discoveryLoading = false; renderGames(); } }
+}
 let favoriteIds = new Set(), favoriteGames = [], showFavorites = false, libraryGeneration = 0;
 const libraryToggle = document.createElement('button');
 libraryToggle.textContent = 'Show my saved games'; libraryToggle.hidden = true;
@@ -16,6 +37,7 @@ $('#games').before(libraryToggle);
 libraryToggle.onclick = () => {
   showFavorites = !showFavorites; libraryToggle.setAttribute('aria-pressed', String(showFavorites));
   libraryToggle.textContent = showFavorites ? 'Show all games' : 'Show my saved games'; renderGames();
+  if (!showFavorites) { clearTimeout(searchTimer); void loadDiscovery(); }
 };
 async function loadLibrary() {
   const generation = ++libraryGeneration;
@@ -120,9 +142,14 @@ $('#forgot').onclick = async () => {
 };
 function renderGames() {
   const area = $('#games'); area.replaceChildren();
-  const query = $('#search').value.toLowerCase();
-  const matches = (showFavorites ? favoriteGames : games).filter(game => `${game.title} ${game.description}`.toLowerCase().includes(query));
+  const query = $('#search').value.trim().toLowerCase();
+  moreGames.hidden = showFavorites || (!discoveryCursor && !discoveryError); moreGames.disabled = discoveryLoading;
+  moreGames.textContent = discoveryError ? 'Retry loading games' : 'Load more games';
+  area.setAttribute('aria-busy', String(!showFavorites && discoveryLoading));
+  discoveryStatus.textContent = showFavorites ? '' : discoveryLoading ? 'Loading games…' : discoveryError || `${games.length} ${games.length === 1 ? 'game' : 'games'} loaded${discoveryCursor ? '. More available.' : '.'}`;
+  const matches = showFavorites ? favoriteGames.filter(game => `${game.title} ${game.description}`.toLowerCase().includes(query)) : games;
   if (!matches.length) {
+    if (!showFavorites && (discoveryLoading || discoveryError)) return;
     const empty = document.createElement('div'); empty.className = 'empty';
     const title = document.createElement('h3'); title.textContent = query ? 'No matching games yet.' : 'A new universe starts small.';
     const copy = document.createElement('p'); copy.textContent = query ? 'Try another search.' : 'The first creator games will appear here after review and publication. There are no published games yet.';
@@ -156,11 +183,13 @@ function renderGames() {
     }
   }
 }
-$('#search').oninput = renderGames;
+$('#search').oninput = () => {
+  clearTimeout(searchTimer); ++discoveryGeneration;
+  games = []; discoveryCursor = null; discoveryError = ''; discoveryLoading = !showFavorites;
+  renderGames(); if (!showFavorites) searchTimer = setTimeout(() => { void loadDiscovery(); }, 350);
+};
 api('/auth/me').then(result => { user = result.user; displayAccount(); }).catch(() => {});
-api('/games').then(result => { games = result.games; renderGames(); }).catch(() => {
-  $('#games').textContent = 'Games could not load. Please refresh to try again.';
-});
+void loadDiscovery();
 // Account-link secrets live in a URL fragment, never a request query or referrer.
 const accountLink = new URLSearchParams(location.hash.slice(1));
 const verifyToken = accountLink.get('verify-email');
@@ -253,7 +282,7 @@ async function loadProject(id) {
         const restore = publishedBuild && new Date(version.createdAt) < new Date(publishedBuild.createdAt);
         action(restore ? 'Restore this version' : 'Publish this version', async () => {
           await api(`/projects/${id}/${restore ? 'rollback' : 'publish'}`, { versionId: version.id });
-          await loadProject(id); await loadProjects(); games = (await api('/games')).games; renderGames();
+          await loadProject(id); await loadProjects(); await loadDiscovery();
           announce(restore ? 'Earlier approved build restored for new launches.' : 'Published.');
         });
       }

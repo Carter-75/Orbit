@@ -16,7 +16,7 @@ const { app, auth } = await createApp({ db, config, sendMail: null });
 const demoFlag = process.argv.indexOf('--demo-package');
 if (demoFlag !== -1) {
   if (!process.argv[demoFlag + 1]) throw new Error('Provide the local starter ZIP path.');
-  await seedDemo(db, process.argv[demoFlag + 1]);
+  await seedDemo(db, process.argv[demoFlag + 1], { catalogFixtures: process.argv.includes('--catalog-fixtures') });
 }
 const server = http.createServer(app);
 const assetServer = http.createServer(createAssetApp({ db, config }));
