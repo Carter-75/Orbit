@@ -18,10 +18,22 @@ Run from the repository using Node 22 and installed dependencies, in an authoriz
 
 Concurrent requests cannot append duplicate grants. An already-admin result does not rotate sessions again. An account changed between reading and writing fails closed and needs a fresh inspection. If a network timeout makes the outcome uncertain, run the preview to inspect current state; do not assume a failed command means no database write happened.
 
+## Removing administrator access
+
+Use an authorized operator environment and preview the exact target:
+
+```sh
+npm run admin:revoke -- --user USER_UUID --reason "Moderator access ended after owner review"
+```
+
+After checking the database, username, UUID and target role, apply with `--apply --confirm USER_UUID`. The account becomes a player; it is not deleted, unsuspended or marked verified. The role change, authorization-version increment and `revoke_admin` history entry are atomic. Existing sessions lose access; even a subsequent valid player session cannot use admin endpoints. Repeating removal of an already-player account makes no further changes. Unlike granting privileges, removing them is permitted when the administrator is suspended or unverified.
+
+This can remove the **last administrator**; the preview warns about that possibility rather than implying a race-prone administrator count is a safety guarantee. Keep a separately authorized operator recovery path and test it before production. For recovery, use the grant command on a verified, unsuspended adult account and sign in again. Do not temporarily add a public promotion endpoint. Removing the role is not password recovery or a complete incident response: investigate compromise, rotate affected provider credentials where appropriate, and review the retained audit trail. A network failure can leave the result uncertain; preview current state before retrying.
+
 ## Remaining release gates
 
 Production has not been provisioned. Use [private enrollment](private-enrollment.md) to register the intended owner while `PUBLIC_LAUNCH=false`; **do not temporarily open public registration, seed a demo account, or manually mark email verified**. This command covers privilege assignment after legitimate registration/verification, not email-provider setup or deployed validation.
 
-Administrator MFA, secure demotion/recovery, access recertification, operator-identity attribution and production account verification remain launch work. The command is not proof that production admin access is ready. It adds no new environment settings to Render and is never run automatically on deployment.
+Administrator MFA, rehearsed operator recovery, access recertification, operator-identity attribution and production account verification remain launch work. The commands are not proof that production admin access is ready. They add no new environment settings to Render and are never run automatically on deployment.
 
 Design references: [OWASP least-privilege authorization](https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html), [session changes after privilege elevation](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), and [MFA for privileged accounts](https://cheatsheetseries.owasp.org/cheatsheets/Multifactor_Authentication_Cheat_Sheet.html).

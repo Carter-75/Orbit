@@ -8,6 +8,7 @@
   },
   "scripts": {
     "admin:grant": "node --env-file-if-exists=.env scripts/provision-admin.js",
+    "admin:revoke": "node --env-file-if-exists=.env scripts/provision-admin.js --revoke",
     "enrollment:invite": "node --env-file-if-exists=.env scripts/invite-enrollment.js",
     "test:browser": "playwright test",
     "start": "node --env-file-if-exists=.env src/server.js",

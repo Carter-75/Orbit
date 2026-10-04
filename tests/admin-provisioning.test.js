@@ -3,10 +3,13 @@ import assert from 'node:assert/strict';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { MongoClient } from 'mongodb';
-import { provisionAdmin } from '../src/admin-provisioning.js';
+import { provisionAdmin, revokeAdmin } from '../src/admin-provisioning.js';
 import { createAuth } from '../src/auth.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import express from 'express';
+import request from 'supertest';
+import { createAdmin } from '../src/admin.js';
 
 let mongo, client, db, auth;
 before(async () => {
@@ -33,10 +36,58 @@ test('operator CLI previews and applies against the selected database without em
   const applied = await run(process.execPath, [...args, '--apply', '--confirm', userId], { env });
   assert.equal(JSON.parse(applied.stdout).status, 'granted');
   assert.equal(applied.stdout.includes(env.MONGODB_URI), false);
+  const revokePreview = await run(process.execPath, [...args, '--revoke'], { env });
+  assert.equal(JSON.parse(revokePreview.stdout).targetRole, 'player');
+  assert.equal((await db.collection('users').findOne({ _id: userId })).role, 'admin');
+  const revoked = await run(process.execPath, [...args, '--revoke', '--apply', '--confirm', userId], { env });
+  assert.equal(JSON.parse(revoked.stdout).status, 'revoked');
+  assert.equal((await db.collection('users').findOne({ _id: userId })).role, 'player');
   await assert.rejects(run(process.execPath, args, { env: { ...env, MONGODB_URI: 'invalid-secret-database-uri' } }), error => {
     assert.equal(error.stderr.includes('invalid-secret-database-uri'), false);
     assert.match(error.stderr, /Set MONGODB_URI securely/); return true;
   });
+});
+
+test('operator revocation invalidates an existing admin session and remains idempotent', async () => {
+  const app = express(); app.use(auth.authenticate);
+  app.use('/admin', await createAdmin({ db, auth }));
+  const userId = await account({ role: 'admin' }), token = randomBytes(32).toString('base64url');
+  await db.collection('sessions').insertOne({ _id: createHash('sha256').update(token).digest('hex'), userId, authVersion: 0, expiresAt: new Date(Date.now() + 60000) });
+  const cookie = `orbit_session=${token}`;
+  assert.equal((await auth.resolveSession(cookie)).role, 'admin');
+  assert.equal((await request(app).get('/admin/queue').set('Cookie', cookie)).status, 200);
+  assert.equal((await revokeAdmin(db, input(userId))).status, 'preview');
+  await assert.rejects(revokeAdmin(db, { ...input(userId), apply: true, confirmation: randomUUID() }), /Confirmation/);
+  const result = await revokeAdmin(db, { ...input(userId), apply: true, confirmation: userId });
+  assert.equal(result.status, 'revoked'); assert.equal(await auth.resolveSession(cookie), null);
+  assert.equal((await request(app).get('/admin/queue').set('Cookie', cookie)).status, 401);
+  const playerToken = randomBytes(32).toString('base64url');
+  await db.collection('sessions').insertOne({ _id: createHash('sha256').update(playerToken).digest('hex'), userId, authVersion: 1, expiresAt: new Date(Date.now() + 60000) });
+  assert.equal((await request(app).get('/admin/queue').set('Cookie', `orbit_session=${playerToken}`)).status, 403);
+  assert.equal((await revokeAdmin(db, { ...input(userId), apply: true, confirmation: userId })).status, 'already_player');
+  const user = await db.collection('users').findOne({ _id: userId });
+  assert.equal(user.authVersion, 1); assert.equal(user.privilegeHistory.length, 1);
+  assert.equal(user.privilegeHistory[0].action, 'revoke_admin'); assert.equal(user.role, 'player');
+});
+
+test('revocation works for suspended or unverified admins and concurrent calls append one decision', async () => {
+  const userId = await account({ role: 'admin', suspended: true, emailVerified: false });
+  const request = { ...input(userId), apply: true, confirmation: userId };
+  const results = await Promise.allSettled([revokeAdmin(db, request), revokeAdmin(db, request)]);
+  assert.ok(results.some(result => result.status === 'fulfilled' && result.value.status === 'revoked'));
+  const user = await db.collection('users').findOne({ _id: userId });
+  assert.equal(user.role, 'player'); assert.equal(user.suspended, true); assert.equal(user.emailVerified, false);
+  assert.equal(user.privilegeHistory.length, 1); assert.equal(user.authVersion, 1);
+});
+
+test('a failed demotion write leaves role, session version and audit unchanged', async () => {
+  const userId = await account({ role: 'admin' });
+  await db.command({ collMod: 'users', validator: { role: { $ne: 'player' } }, validationLevel: 'strict' });
+  try {
+    await assert.rejects(revokeAdmin(db, { ...input(userId), apply: true, confirmation: userId }));
+    const user = await db.collection('users').findOne({ _id: userId });
+    assert.equal(user.role, 'admin'); assert.equal(user.authVersion, 0); assert.equal(user.privilegeHistory, undefined);
+  } finally { await db.command({ collMod: 'users', validator: {} }); }
 });
 
 test('provisioning previews without writes, requires exact confirmation, atomically grants and revokes old sessions', async () => {
