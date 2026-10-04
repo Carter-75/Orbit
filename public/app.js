@@ -63,6 +63,10 @@ function displayAccount() {
   if (user) void loadProjects();
 }
 const enrollmentLabel = element('label', 'Invitation code (if invited)');
+$('#auth-dialog').setAttribute('aria-labelledby', 'auth-title');
+$('#auth-dialog').setAttribute('aria-describedby', 'auth-description');
+$('#reset-dialog h2').id = 'reset-title';
+$('#reset-dialog').setAttribute('aria-labelledby', 'reset-title');
 const enrollmentInput = document.createElement('input');
 enrollmentInput.name = 'invitationCode'; enrollmentInput.type = 'password';
 enrollmentInput.autocomplete = 'off'; enrollmentInput.maxLength = 43;

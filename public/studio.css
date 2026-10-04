@@ -5,3 +5,14 @@ textarea:focus-visible,select:focus-visible{outline:3px solid #3b8978;outline-of
 .avatar-badge{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:42px;height:42px;border-radius:50%;font-weight:800;color:#fff}.avatar-violet{background:#6841a5}.avatar-blue{background:#265e9b}.avatar-teal{background:#16685e}.avatar-amber{background:#825715}.avatar-rose{background:#a13b63}.avatar-slate{background:#465568}.profile-preview{display:flex;align-items:center;gap:12px;margin:15px 0}.profile-form{max-width:660px}.profile-form fieldset{display:flex;flex-wrap:wrap;gap:16px;padding:18px;border:1px solid #cbd1c7;border-radius:10px}.profile-form fieldset label{display:flex;align-items:center;gap:7px;cursor:pointer}.profile-form input[type=radio]{width:20px;height:20px;margin:0}.profile-form>label{display:block;margin:20px 0}.profile-form small{display:block;margin-top:7px;color:#5b6966}.profile-form button{color:#182524;background:#edf0e5}
 button{color:inherit}
 .version .avatar-badge{flex:0 0 42px;font-size:16px}
+/* Native dialogs otherwise inherit the OS dark palette, unlike the light page. */
+dialog{color-scheme:light;background:#f3f4ed;color:#182524;max-height:calc(100dvh - 32px);overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+dialog input{background:#fff;color:#182524;min-width:0;font-size:16px}
+dialog small{font-size:13px;color:#5b6966;overflow-wrap:anywhere}
+dialog .error{overflow-wrap:anywhere}
+@media(max-width:520px){
+  dialog{padding:20px;width:calc(100% - 24px);max-height:calc(100dvh - 24px)}
+  body>header{height:auto;min-height:100px;flex-wrap:wrap;gap:16px;padding-block:18px}
+  body>header nav{flex-wrap:wrap;gap:12px;max-width:100%}
+  dialog h2{font-size:28px}
+}
