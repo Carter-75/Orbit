@@ -39,6 +39,63 @@ async function enroll(actor, device = testAuthenticator()) {
 }
 const active = actor => adminMfaActive(db, { user: actor.user, authSessionId: actor.sessionId });
 
+async function verify(actor, device) {
+  const options = await post(actor, 'authenticate/options');
+  assert.equal(options.status, 200, JSON.stringify(options.body));
+  const result = await post(actor, 'authenticate/verify', { challengeId: options.body.challengeId, response: device.authenticate(options.body.options, origin) });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+}
+
+test('a backup key works in a separate session and adding keys rechecks step-up at completion', async () => {
+  const actor = await account(), primary = await enroll(actor);
+  await verify(actor, primary);
+  const backup = await enroll(actor);
+  const other = { ...actor, ...await session(actor.user._id) };
+  assert.equal(await active(other), false);
+  await verify(other, backup); assert.equal(await active(other), true);
+  const options = await post(actor, 'register/options', { password });
+  assert.equal(options.status, 200); assert.equal(options.body.options.excludeCredentials.length, 2);
+  await db.collection('sessions').updateOne({ _id: actor.sessionId }, { $set: { adminVerifiedUntil: new Date(0) } });
+  assert.equal((await post(actor, 'register/verify', { challengeId: options.body.challengeId,
+    response: testAuthenticator().register(options.body.options, origin) })).status, 403);
+  assert.equal((await db.collection('users').findOne({ _id: actor.user._id })).adminPasskeys.length, 2);
+  assert.equal(await active(other), true);
+});
+
+test('simultaneous first-key enrollments from separate sessions cannot both bypass existing-key verification', async () => {
+  const actor = await account(), other = { ...actor, ...await session(actor.user._id) };
+  const actors = [actor, other];
+  const options = await Promise.all(actors.map(a => post(a, 'register/options', { password })));
+  for (const result of options) assert.equal(result.status, 200);
+  const results = await Promise.all(actors.map((a, i) => post(a, 'register/verify', {
+    challengeId: options[i].body.challengeId, response: testAuthenticator().register(options[i].body.options, origin),
+  })));
+  assert.deepEqual(results.map(r => r.status).sort(), [200, 409]);
+  const stored = await db.collection('users').findOne({ _id: actor.user._id });
+  assert.equal(stored.adminPasskeys.length, 1); assert.equal(stored.privilegeHistory.length, 1);
+  assert.equal(await active(actor), false); assert.equal(await active(other), false);
+  assert.equal((await post(other, 'register/options', { password })).status, 403);
+});
+
+test('concurrent backup enrollment at capacity never stores more than five credentials', async () => {
+  const actor = await account(), primary = await enroll(actor);
+  await verify(actor, primary);
+  const other = { ...actor, ...await session(actor.user._id) }; await verify(other, primary);
+  // Preload three inert slots to isolate the capacity race from rate limiting.
+  // Only the real primary key above is used to authorize either ceremony.
+  await db.collection('users').updateOne({ _id: actor.user._id }, { $push: { adminPasskeys: { $each:
+    Array.from({ length: 3 }, () => ({ id: randomBytes(32).toString('base64url'), counter: 0 })) } } });
+  const actors = [actor, other], options = await Promise.all(actors.map(a => post(a, 'register/options', { password })));
+  for (const result of options) { assert.equal(result.status, 200); assert.equal(result.body.options.excludeCredentials.length, 4); }
+  const results = await Promise.all(actors.map((a, i) => post(a, 'register/verify', {
+    challengeId: options[i].body.challengeId, response: testAuthenticator().register(options[i].body.options, origin),
+  })));
+  assert.deepEqual(results.map(r => r.status).sort(), [200, 409]);
+  const stored = await db.collection('users').findOne({ _id: actor.user._id });
+  assert.equal(stored.adminPasskeys.length, 5); assert.equal(stored.privilegeHistory.length, 2);
+  assert.equal((await post(actor, 'register/options', { password })).status, 409);
+});
+
 test('lost-key recovery rejects old sessions and requires separate regrant before enrolling a replacement', async () => {
   const actor = await account(), device = await enroll(actor);
   const options = await post(actor, 'authenticate/options');
