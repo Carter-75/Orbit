@@ -30,6 +30,8 @@ If adding custom domains later, explicitly update both origin values through a r
 
 ## Launch, recovery and scale
 
+Use the [local multiplayer load harness and measured baseline](load-testing.md) before staging load work. Its 64-player run did not sustain the requested update rate; zero reported errors is not a production capacity claim.
+
 - Public launch is a separate release decision for the intended 13+ audience. Complete the operational/security review before changing `PUBLIC_LAUNCH` to `true` in the Blueprint. Email credentials alone do not establish moderated public-launch readiness.
 - Paid deployment does not enable live monetization. Stripe and advertising remain gated by provider setup, verified integration, approved commission/fees and actual business eligibility. See `research-hosting-monetization.md`.
 - The Blueprint deliberately runs one app instance. In-memory rooms are interrupted by app restarts; persistent accounts/games should survive through Atlas. Shared room routing/state and reconnect recovery must be verified before increasing the instance count. [Render WebSockets](https://render.com/docs/websocket)

@@ -7,6 +7,7 @@
     "node": ">=22.12 <25"
   },
   "scripts": {
+    "test:load:local": "node scripts/load-realtime.js",
     "admin:recover": "node --env-file-if-exists=.env scripts/recover-admin.js",
     "admin:grant": "node --env-file-if-exists=.env scripts/provision-admin.js",
     "admin:revoke": "node --env-file-if-exists=.env scripts/provision-admin.js --revoke",
