@@ -8,6 +8,8 @@ import { MongoClient } from 'mongodb';
 import { createAuth, hashPassword } from '../src/auth.js';
 import { createAdminPasskeys, adminMfaActive } from '../src/admin-passkeys.js';
 import { testAuthenticator } from './fixtures/passkey-authenticator.js';
+import { recoverAdminPasskeys } from '../src/admin-recovery.js';
+import { provisionAdmin } from '../src/admin-provisioning.js';
 
 let mongo, client, db, app, passwordHash;
 const origin = 'https://orbit.example.test', password = 'A strong passkey setup test password!';
@@ -36,6 +38,25 @@ async function enroll(actor, device = testAuthenticator()) {
   assert.equal(registered.status, 200, JSON.stringify(registered.body)); return device;
 }
 const active = actor => adminMfaActive(db, { user: actor.user, authSessionId: actor.sessionId });
+
+test('lost-key recovery rejects old sessions and requires separate regrant before enrolling a replacement', async () => {
+  const actor = await account(), device = await enroll(actor);
+  const options = await post(actor, 'authenticate/options');
+  assert.equal((await post(actor, 'authenticate/verify', { challengeId: options.body.challengeId, response: device.authenticate(options.body.options, origin) })).status, 200);
+  await recoverAdminPasskeys(db, { userId: actor.user._id, operator: 'operator.test', caseReference: 'REC-200',
+    reason: 'Lost device recovery verified independently', apply: true, confirmation: actor.user._id });
+  assert.equal(await active(actor), false);
+  assert.equal((await post(actor, 'register/options', { password })).status, 401);
+  const player = { ...actor, ...await session(actor.user._id, 1) };
+  assert.equal((await post(player, 'register/options', { password })).status, 403);
+  await provisionAdmin(db, { userId: actor.user._id, reason: 'Separate approval after recovery verification', apply: true, confirmation: actor.user._id });
+  const restored = { user: { ...actor.user, authVersion: 2 }, ...await session(actor.user._id, 2) };
+  const replacement = await enroll(restored);
+  assert.equal(await active(restored), false);
+  const assertion = await post(restored, 'authenticate/options');
+  assert.equal((await post(restored, 'authenticate/verify', { challengeId: assertion.body.challengeId, response: replacement.authenticate(assertion.body.options, origin) })).status, 200);
+  assert.equal(await active(restored), true);
+});
 
 test('real cryptographic registration and assertion grant a session-only, expiring admin step-up', async () => {
   const actor = await account(), device = await enroll(actor);
