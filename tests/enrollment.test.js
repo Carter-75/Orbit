@@ -8,6 +8,9 @@ import { createApp } from '../src/app.js';
 import { drainMailOutbox } from '../src/auth.js';
 import { issueEnrollment, enrollmentAvailable, consumeEnrollment } from '../src/enrollment.js';
 import { provisionAdmin } from '../src/admin-provisioning.js';
+import { testAuthenticator } from './fixtures/passkey-authenticator.js';
+import { grantSessionActive } from '../src/grant-session.js';
+import { createHash } from 'node:crypto';
 
 let mongo, client, db, app;
 const origin = 'https://orbit.example.test', mail = [];
@@ -43,7 +46,30 @@ test('closed production enrollment requires an email-bound invitation and still 
   const login = await post('login', { identifier: account.email, password: account.password });
   assert.equal(login.status, 200); assert.equal(login.body.user.role, 'admin');
   const currentCookie = login.headers['set-cookie'].at(-1).split(';')[0];
+  assert.equal((await request(app).get('/api/admin/queue').set('Cookie', currentCookie)).status, 403);
+  const ceremony = (path, body) => request(app).post(`/api/account/admin-passkeys/${path}`).set('Cookie', currentCookie).set('Origin', origin).send(body);
+  const device = testAuthenticator();
+  const registration = await ceremony('register/options', { password: account.password });
+  assert.equal(registration.status, 200, JSON.stringify(registration.body));
+  assert.equal((await ceremony('register/verify', { challengeId: registration.body.challengeId, response: device.register(registration.body.options, origin) })).status, 200);
+  assert.equal((await request(app).get('/api/admin/queue').set('Cookie', currentCookie)).status, 403);
+  const projectId = randomUUID(), versionId = randomUUID();
+  await db.collection('projects').insertOne({ _id: projectId, ownerId: randomUUID(), status: 'draft' });
+  await db.collection('versions').insertOne({ _id: versionId, projectId, status: 'pending', manifest: { entry: 'index.html', capabilities: [] } });
+  const launch = () => request(app).post(`/api/games/${projectId}/launch`).set('Cookie', currentCookie).set('Origin', origin).send({ preview: true, versionId });
+  assert.equal((await launch()).status, 403);
+  const assertion = await ceremony('authenticate/options', {});
+  assert.equal((await ceremony('authenticate/verify', { challengeId: assertion.body.challengeId, response: device.authenticate(assertion.body.options, origin) })).status, 200);
   assert.equal((await request(app).get('/api/admin/queue').set('Cookie', currentCookie)).status, 200);
+  const preview = await launch(); assert.equal(preview.status, 200, JSON.stringify(preview.body));
+  const grant = await db.collection('launchGrants').findOne({ _id: preview.body.grantId });
+  assert.equal(grant.adminMfaRequired, true); assert.equal(await grantSessionActive(db, grant), true);
+  const sessionId = createHash('sha256').update(currentCookie.split('=')[1]).digest('hex');
+  await db.collection('sessions').updateOne({ _id: sessionId }, { $set: { adminVerifiedUntil: new Date(0) } });
+  for (const route of ['queue', 'cases', 'payment-events', 'payment-ledger']) {
+    assert.equal((await request(app).get(`/api/admin/${route}`).set('Cookie', currentCookie)).status, 403);
+  }
+  assert.equal((await launch()).status, 403); assert.equal(await grantSessionActive(db, grant), false);
   assert.equal((await request(app).get('/api/platform')).body.publicLaunch, false);
   await assert.rejects(issue(account.email), /already exists/);
 });

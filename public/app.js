@@ -3,6 +3,7 @@ import { renderProfile } from './profile.js';
 import { renderInvitations, setInvitationRoom } from './invitations.js';
 import { createGameBridge } from './game-bridge.js';
 import { renderSafety, reportGame, renderModeration } from './safety.js';
+import { renderAdminPasskeys } from './admin-passkeys.js';
 let closeBridge;
 const $ = (selector) => document.querySelector(selector);
 let mode = 'login';
@@ -73,7 +74,9 @@ function displayAccount() {
   libraryGeneration++; favoriteIds = new Set(); favoriteGames = []; showFavorites = false;
   libraryToggle.hidden = !user; libraryToggle.textContent = 'Show my saved games'; libraryToggle.setAttribute('aria-pressed', 'false');
   renderGames(); if (user) void loadLibrary();
-  renderSafety(user); void renderModeration(user, launchGame);
+  renderSafety(user);
+  renderAdminPasskeys(user, () => void renderModeration(user, launchGame));
+  void renderModeration(user, launchGame);
   if (!user) { closeBridge?.(); $('#game-frame').removeAttribute('src'); $('#play-area').hidden = true; }
   void renderSocial(user);
   $('#account-button').textContent = user ? user.username : 'Sign in';

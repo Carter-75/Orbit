@@ -1,6 +1,6 @@
-# Administrator passkeys — server protocol checkpoint
+# Administrator passkeys — production gate and browser workflow
 
-**Not yet enabled in the application.** `src/admin-passkeys.js` implements the server protocol and tests mount it in isolation. The production app does not mount the router, and moderation does not yet require the resulting step-up. Do not claim Orbit has enforced administrator MFA from this checkpoint.
+The app mounts the ceremony at `/api/account/admin-passkeys`, outside the protected administrator router. Production always requires fresh step-up for every `/api/admin` endpoint and administrator preview of another creator’s build. Local previews remain explicitly separate; `--passkeys` starts a disposable localhost preview with enforcement enabled. This is local implementation evidence, not a deployed or launch-ready claim.
 
 ## Implemented protocol
 
@@ -16,6 +16,8 @@
 
 Tests use disposable MongoDB, real P-256 key pairs/signatures and the unmodified library verifier. Synthetic authenticator data exercises registration and assertion success; tests reject wrong origin, RP ID, challenge, signature, missing device verification and reused counters. They also cover password/role/Origin gates, session isolation/expiry, challenge replay/expiry, credential ownership uniqueness, enrollment versus step-up distinction, and revocation. These are server protocol tests, not device interoperability or user-experience evidence.
 
-Next: mount the router, add trusted browser passkey setup/check controls, require fresh step-up for every moderation/financial admin endpoint, verify using a browser virtual authenticator and real supported device, test multiple/backup keys and enrollment races, and implement an audited operator recovery/reset ceremony that revokes all sessions. Keep recovery out of ordinary password reset so it cannot silently bypass MFA. Do not publicly launch without these integration and recovery checks. Production MFA activation is not blocked on obtaining financial-provider accounts.
+Trusted account UI uses native WebAuthn JSON parsing/serialization, password-confirmed enrollment, explicit verification and cancellation when the account view changes. Unsupported browsers fail closed. A Chrome virtual-authenticator test exercises real browser registration/assertion, locked-before-verification moderation, unlocked queue and logout. Production-mode integration tests cover enrollment without authorization, successful assertion, protected finance/report routes and expiry. Private preview grants carry their MFA requirement; asset/SDK authorization rechecks that proof, and legacy preview grants without a policy must be reissued. Ordinary player and creator-owned previews do not require administrator MFA.
+
+Next: verify a real supported device, test multiple/backup keys and enrollment races, and implement an audited operator recovery/reset ceremony that revokes all sessions. Keep recovery out of ordinary password reset so it cannot silently bypass MFA. Do not publicly launch without these recovery and interoperability checks. Use a stable HTTPS hostname for production; the passkey browser fixture uses localhost rather than an IP-address RP ID.
 
 References checked October 3: [SimpleWebAuthn server integration](https://simplewebauthn.dev/docs/packages/server), [browser integration](https://simplewebauthn.dev/docs/packages/browser). Implementation settings deliberately require user verification rather than using the library's enrollment preference defaults.

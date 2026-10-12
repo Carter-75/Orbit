@@ -26,6 +26,8 @@ test('SDK saves are player-scoped, capability-gated, bounded and preview-isolate
     const value = { level: 4, '$set': { coins: 5 }, nested: ['safe'] };
     assert.equal((await send({ operation: 'set', value })).status, 200);
     assert.deepEqual((await send({ operation: 'get' })).body.value, value);
+    assert.equal((await send({ grantId: previewId, operation: 'get' })).status, 403, 'legacy preview grants require reissue');
+    await db.collection('launchGrants').updateOne({ _id: previewId }, { $set: { adminMfaRequired: false } });
     assert.equal((await send({ grantId: previewId, operation: 'get' })).body.value, null);
     assert.equal((await send({ operation: 'get' }).set('test-user', 'bob')).status, 403);
     assert.equal((await send({ operation: 'set', value: 'x'.repeat(8193) })).status, 413);

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createLedger } from './ledger.js';
+import { adminMfaActive } from './admin-passkeys.js';
 
 const reasonSchema = z.object({ reason: z.string().trim().min(10).max(2000) }).strict();
 const reviewSchema = reasonSchema.extend({ decision: z.enum(['approve', 'reject']) });
@@ -22,6 +23,7 @@ export async function createAdmin({ db, config = {}, auth }) {
     // Recheck the current account so a demoted/suspended admin cannot use an old identity snapshot.
     const eligible = await users.findOne({ _id: req.user._id, role: 'admin', emailVerified: true, suspended: { $ne: true } }, { projection: { _id: 1 } });
     if (!eligible) throw problem(403, 'Administrator access with a verified email is required.');
+    if ((config.production || config.adminMfaRequired) && !await adminMfaActive(db, req)) throw problem(403, 'Verify your administrator passkey to unlock moderation for ten minutes.');
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.get('origin') !== origin) throw problem(403, 'Request origin is not permitted.');
     next();
   }));

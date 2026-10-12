@@ -30,7 +30,7 @@ await writeFile(new URL('browser-revision.zip', directory), zip(revision));
 const hostile = [];
 for (const path of ['index.html', 'probe.js', 'orbit.json']) hostile.push([path, await readFile(new URL(`../tests/fixtures/hostile-game/${path}`, import.meta.url))]);
 await writeFile(new URL('browser-hostile.zip', directory), zip(hostile));
-process.env.PORT = '3040';
+process.env.PORT = process.argv.includes('--passkeys') ? '3050' : '3040';
 process.argv.push('--demo-package', resolve('.data/browser-starter.zip'));
 process.argv.push('--catalog-fixtures');
 await import('./preview.js');

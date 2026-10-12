@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
 import { recordLaunch } from './analytics.js';
+import { adminMfaActive } from './admin-passkeys.js';
 
 export async function createLaunch({ db, config, auth }) {
   await db.collection('launchGrants').createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
@@ -10,6 +11,8 @@ export async function createLaunch({ db, config, auth }) {
     if (!project || project.status === 'suspended') return res.status(404).json({ error: 'Game unavailable.' });
     const preview = req.body.preview === true;
     if (preview && req.user._id !== project.ownerId && req.user.role !== 'admin') return res.sendStatus(403);
+    const adminMfaRequired = Boolean(preview && req.user._id !== project.ownerId && (config.production || config.adminMfaRequired));
+    if (adminMfaRequired && !await adminMfaActive(db, req)) return res.status(403).json({ error: 'Verify your administrator passkey before previewing another creator’s build.' });
     if (!preview && project.status !== 'published') return res.status(404).json({ error: 'Game is not published.' });
     const versionId = preview ? req.body.versionId : project.publishedVersion;
     if (typeof versionId !== 'string') return res.status(400).json({ error: 'Choose a game version.' });
@@ -22,7 +25,7 @@ export async function createLaunch({ db, config, auth }) {
     const ticket = randomBytes(32).toString('base64url');
     const expiresAt = new Date(Math.min(Date.now() + 30 * 60000, session.expiresAt.getTime()));
     await db.collection('launchGrants').insertOne({ _id: createHash('sha256').update(ticket).digest('hex'),
-      projectId: project._id, versionId, userId: req.user._id, authVersion: req.user.authVersion, sessionId: session._id, preview, expiresAt });
+      projectId: project._id, versionId, userId: req.user._id, authVersion: req.user.authVersion, sessionId: session._id, preview, adminMfaRequired, expiresAt });
     await recordLaunch(db, { projectId: project._id, ownerId: project.ownerId, user: req.user, preview });
     res.json({ grantId: createHash('sha256').update(ticket).digest('hex'), url: `${config.assetOrigin}/play/${ticket}/${version.manifest.entry}`, expiresAt, manifest: version.manifest });
   });

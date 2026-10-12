@@ -10,7 +10,10 @@ import { seedDemo } from './demo-seed.js';
 // Explicit developer preview. Production start never selects ephemeral storage.
 const mongo = await MongoMemoryServer.create();
 const port = Number(process.env.PORT || 3000);
-const config = readConfig({ MONGODB_URI: mongo.getUri(), PORT: String(port), APP_ORIGIN: `http://127.0.0.1:${port}`, ASSET_ORIGIN: `http://127.0.0.1:${port + 1}` });
+const passkeys = process.argv.includes('--passkeys');
+const config = readConfig({ MONGODB_URI: mongo.getUri(), PORT: String(port), APP_ORIGIN: `http://${passkeys ? 'localhost' : '127.0.0.1'}:${port}`, ASSET_ORIGIN: `http://127.0.0.1:${port + 1}` });
+// Explicit disposable preview only; production always requires administrator MFA.
+config.adminMfaRequired = passkeys;
 const { client, db } = await connectDatabase(config);
 const { app, auth } = await createApp({ db, config, sendMail: null });
 const demoFlag = process.argv.indexOf('--demo-package');

@@ -25,8 +25,8 @@ export async function adminMfaActive(db, req) {
     'adminPasskeys.id': session.adminVerifiedCredentialId }, { projection: { _id: 1 } }));
 }
 
-// Server-side passkey protocol. Mount only after auth.authenticate. Admin-route
-// enforcement and UI are separate integration steps, not provided by this router.
+// Mounted after auth.authenticate, outside the step-up-protected admin router so
+// administrators can complete the ceremony before accessing privileged routes.
 export async function createAdminPasskeys({ db, config, auth }) {
   const router = Router(), users = db.collection('users'), sessions = db.collection('sessions');
   const origin = new URL(config.appOrigin).origin, rpID = new URL(origin).hostname;

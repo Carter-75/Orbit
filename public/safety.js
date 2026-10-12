@@ -69,7 +69,10 @@ export async function renderModeration(user, launchGame) {
   }
   function textField(parent, label) { const wrapper = el('label', label), input = el('textarea'); input.rows = 2; input.minLength = 10; input.maxLength = 2000; wrapper.append(input); parent.append(wrapper); return input; }
   async function refresh() {
+    content.replaceChildren();
+    status.textContent = '';
     const [queue, cases] = await Promise.all([call('/admin/queue'), call('/admin/cases')]);
+    if (!area.isConnected) return;
     content.replaceChildren(el('h3', 'Build review'));
     if (!queue.versions.length) content.append(el('p', 'No builds awaiting review.'));
     for (const version of queue.versions) {
