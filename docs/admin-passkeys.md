@@ -1,0 +1,21 @@
+# Administrator passkeys — server protocol checkpoint
+
+**Not yet enabled in the application.** `src/admin-passkeys.js` implements the server protocol and tests mount it in isolation. The production app does not mount the router, and moderation does not yet require the resulting step-up. Do not claim Orbit has enforced administrator MFA from this checkpoint.
+
+## Implemented protocol
+
+- Uses pinned `@simplewebauthn/server` 14.0.3 for option generation and cryptographic verification, with exact configured application origin and hostname RP ID. Production needs a stable HTTPS application domain. Changing domains can make previously enrolled credentials unusable; choose and verify the intended domain before onboarding real admins. Creator asset origins are never accepted as platform origins.
+- Only current, verified, unsuspended admins with live cookie sessions may use the protocol. Mutations require exact Origin. Twelve attempts per account per 15 minutes bound enrollment/authentication attempts, in addition to application/network limits when integrated.
+- First enrollment requires the existing account password. Adding another passkey also requires a currently verified existing passkey in that session. Device-level user verification is required, not merely preferred. Enrollment alone does not unlock moderation: a separate successful assertion is required.
+- One five-minute challenge per session, replaced on a new ceremony. Completion consumes it atomically before verification; retrying a failed or expired ceremony requires new options. User/session/authVersion, purpose and challenge ID are all bound server-side. Challenges and responses are never reflected in logs by this router.
+- Up to five credentials per account, bounded by an atomic user update. Credential IDs are unique across accounts; keys and counters are persisted with enrollment audit history. Stored keys are public keys, not authenticator private keys or biometric data. Public account/profile responses must continue excluding these internal fields.
+- Successful assertions compare/update the stored signature counter and grant at most ten minutes of step-up to that session only, capped by its session expiry. Authorization checks require the current admin/authVersion and that the verified credential remains enrolled. Removal, session expiry and authVersion changes invalidate that proof. Counterless/synced authenticators still rely on single-use challenges; counters alone are not a complete clone-detection guarantee.
+- Security-state writes use majority acknowledgment. Enrollment, counters and session proof span separate documents where applicable; failures consume the challenge and require a new attempt, not automatic replay. No grant/reset/removal credential HTTP endpoint is provided here.
+
+## Evidence and next integration steps
+
+Tests use disposable MongoDB, real P-256 key pairs/signatures and the unmodified library verifier. Synthetic authenticator data exercises registration and assertion success; tests reject wrong origin, RP ID, challenge, signature, missing device verification and reused counters. They also cover password/role/Origin gates, session isolation/expiry, challenge replay/expiry, credential ownership uniqueness, enrollment versus step-up distinction, and revocation. These are server protocol tests, not device interoperability or user-experience evidence.
+
+Next: mount the router, add trusted browser passkey setup/check controls, require fresh step-up for every moderation/financial admin endpoint, verify using a browser virtual authenticator and real supported device, test multiple/backup keys and enrollment races, and implement an audited operator recovery/reset ceremony that revokes all sessions. Keep recovery out of ordinary password reset so it cannot silently bypass MFA. Do not publicly launch without these integration and recovery checks. Production MFA activation is not blocked on obtaining financial-provider accounts.
+
+References checked October 3: [SimpleWebAuthn server integration](https://simplewebauthn.dev/docs/packages/server), [browser integration](https://simplewebauthn.dev/docs/packages/browser). Implementation settings deliberately require user verification rather than using the library's enrollment preference defaults.
