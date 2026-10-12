@@ -13,6 +13,12 @@ test('local load harness uses real sessions, reports complete acknowledgements a
   assert.equal(report.finalPeerStatesSynchronized, true); assert.equal(report.roomsAfterDisconnect, 0);
   assert.ok(report.roundTripMs.p95 >= 0); assert.ok(report.observedHzPerPlayer > 0);
   assert.equal(typeof report.targetRateWithinFivePercent, 'boolean');
+  assert.equal(report.findOneWallTimeByCollection.sessions.calls, report.stateMessages * 2);
+  for (const name of ['users', 'launchGrants', 'projects', 'versions', 'socialPairs']) {
+    assert.equal(report.findOneWallTimeByCollection[name].calls, report.stateMessages);
+    assert.ok(report.findOneWallTimeByCollection[name].p95Ms >= 0);
+  }
+  assert.ok(report.combinedServerAndGeneratorCpuMs.user >= 0);
 });
 test('load harness rejects external targets and unbounded workloads', async () => {
   for (const args of [['--target', 'https://example.test'], ['--players', '1000'], ['--seconds', '0'], ['--hz', '31']]) {

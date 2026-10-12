@@ -27,6 +27,16 @@ Both runs synchronized final peer state and cleaned up all rooms. **The 64-playe
 
 ## Limits and next work
 
+### Profiling follow-up, October 12
+
+The harness now measures `findOne` wall time by collection and combined client/server CPU time. It captures collection names, call counts and elapsed durations only—not query arguments, account IDs, tokens or returned documents. Wall time includes driver scheduling/pool waiting and application event-loop delays; it is **not** isolated Mongo server execution time. Sample arrays and timing calls add instrumentation overhead. Setup reads are excluded; heartbeat reads during a measured interval can add calls.
+
+A 64-player, ten-second instrumented baseline completed 2,624 state updates at 4.05 Hz per player, with p95 round trip 312.00 ms and zero errors. Each update required two session reads and one each from users, launchGrants, projects, versions and socialPairs: seven reads total. Combined client/server CPU was 7,657 ms user + 2,563 ms system over 10.12 seconds. This suggests shared-process CPU pressure; it does not establish that Mongo server execution is the bottleneck.
+
+An experiment issued grant-session, project and version reads together, retaining all authorization checks. It completed the same 2,624 updates at 4.09 Hz, with p95 348.85 ms and CPU 8,000 + 2,375 ms over 10.02 seconds. A single pair is noisy and cannot prove causation, but it provided no useful improvement evidence. The experiment was removed; production authorization sequencing is unchanged. The retained profiling smoke test asserts the seven-read shape on its short two-player workload.
+
+Separate the client generator's event loop before making further optimization claims. Never remove or cache revocation, suspension, session expiry or block checks merely to improve a benchmark.
+
 The generator shares the application event loop and memory; Mongo memory is excluded. Timing omits internet latency, TLS, Render proxies, Atlas placement and database size. Payloads are small; no slow clients, uploads, HTTP/asset mix, reconnect storms or competing admin work are present. Data is synthetic and modest. Ten/twenty-second runs cannot prove long-term stability or memory leak absence. Heartbeat work overlaps the longer run, but these are not thorough expiry/revocation load experiments.
 
 Next, profile per-message database checks and broadcast cost without weakening authorization. Move the generator to a separate process/host, add fixed-rate bounded scheduling with backlog accounting, representative payload sizes, HTTP/assets and a longer soak. After approved deployment, repeat against isolated staging with provider resource metrics and realistic network/Atlas latency. Establish an explicit acceptable latency/rate/error budget before selecting public admission limits. Do not increase the currently single-instance deployment or promise supported concurrency based on this baseline.

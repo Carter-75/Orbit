@@ -19,10 +19,28 @@ if (!Number.isInteger(players) || players < 2 || players > 128 || !Number.isInte
 let mongo, client, server, realtime, shuttingDown = false;
 const sockets = [], latencies = [], errors = []; let snapshots = 0, sent = 0, sequence = 0;
 const histogram = monitorEventLoopDelay({ resolution: 10 });
+const databaseTimings = new Map(); let profiling = false;
 const rounded = n => Math.round(n * 100) / 100;
 function percentile(values, fraction) { return values.length ? rounded([...values].sort((a, b) => a - b)[Math.ceil(values.length * fraction) - 1]) : null; }
 try {
-  mongo = await MongoMemoryServer.create(); client = await MongoClient.connect(mongo.getUri()); const db = client.db('orbit-local-load');
+  mongo = await MongoMemoryServer.create(); client = await MongoClient.connect(mongo.getUri()); const database = client.db('orbit-local-load');
+  // Instrument only findOne wall time in this local harness. Never retain query
+  // values, account identifiers, credentials or returned documents in metrics.
+  const collections = new Map();
+  const db = { collection(name) {
+    if (!collections.has(name)) {
+      const collection = database.collection(name);
+      collections.set(name, new Proxy(collection, { get(target, property) {
+        if (property === 'findOne') return async (...args) => {
+          const measure = profiling, started = performance.now();
+          try { return await target.findOne(...args); }
+          finally { if (measure) { if (!databaseTimings.has(name)) databaseTimings.set(name, []); databaseTimings.get(name).push(performance.now() - started); } }
+        };
+        const value = target[property]; return typeof value === 'function' ? value.bind(target) : value;
+      } }));
+    }
+    return collections.get(name);
+  } };
   const origin = 'http://localhost:3000', auth = await createAuth({ db, config: { appOrigin: origin } });
   await db.collection('socialPairs').createIndex({ members: 1 });
   const projectId = randomUUID(), versionId = randomUUID();
@@ -61,7 +79,7 @@ try {
     if (i % 8 === 0) roomIds.push(peer.latest.roomId);
   }
   const roomCount = realtime.rooms.size, snapshotStart = snapshots;
-  histogram.enable(); const start = performance.now(); const rssStart = process.memoryUsage().rss;
+  histogram.enable(); profiling = true; const cpuStart = process.cpuUsage(); const start = performance.now(); const rssStart = process.memoryUsage().rss;
   while (performance.now() - start < seconds * 1000) {
     const roundStart = performance.now(); sequence++;
     await Promise.all(sockets.map(peer => new Promise((resolve, reject) => {
@@ -71,7 +89,7 @@ try {
     })));
     await delay(Math.max(0, 1000 / hz - (performance.now() - roundStart)));
   }
-  const elapsed = performance.now() - start; histogram.disable();
+  const elapsed = performance.now() - start; histogram.disable(); profiling = false; const cpu = process.cpuUsage(cpuStart);
   // Each member must also see the final state from every other room member.
   const syncStart = performance.now();
   while (!sockets.every(peer => peer.latest.players.every(p => p.state?.sequence === sequence))) {
@@ -84,6 +102,10 @@ try {
     receivedSnapshots: snapshots - snapshotStart, finalPeerStatesSynchronized: true, errors: errors.length,
     roundTripMs: { p50: percentile(latencies, .5), p95: percentile(latencies, .95), p99: percentile(latencies, .99), max: rounded(Math.max(...latencies)) },
     eventLoopDelayMs: { p95: rounded(histogram.percentile(95) / 1e6), max: rounded(histogram.max / 1e6) },
+    findOneWallTimeByCollection: Object.fromEntries([...databaseTimings].map(([name, times]) => [name, {
+      calls: times.length, callsPerStateMessage: rounded(times.length / sent), p50Ms: percentile(times, .5), p95Ms: percentile(times, .95),
+    }])),
+    combinedServerAndGeneratorCpuMs: { user: rounded(cpu.user / 1000), system: rounded(cpu.system / 1000) },
     combinedServerAndGeneratorRssMiB: { start: rounded(rssStart / 1048576), end: rounded(process.memoryUsage().rss / 1048576) },
     limitations: 'Client and server share one Node process. Excludes Mongo process memory, real network/TLS, HTTP/assets, sign-in cost and Render/Atlas sizing. Closed-loop load backs off under delay; not maximum capacity.' };
   shuttingDown = true; for (const peer of sockets) peer.ws.terminate();
